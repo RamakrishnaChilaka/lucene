@@ -251,12 +251,12 @@ final class ConjunctionDISI extends FilterDocIdSetIterator {
         if (doc == NO_MORE_DOCS) {
           return NO_MORE_DOCS;
         }
-        final int otherDoc = other.advance(doc);
+        int otherDoc = other.docID();
+        if (otherDoc < doc) {
+          otherDoc = other.advance(doc);
+        }
         if (otherDoc == doc) {
           return doc;
-        }
-        if (otherDoc == NO_MORE_DOCS) {
-          return NO_MORE_DOCS;
         }
         doc = lead.advance(otherDoc);
       }
