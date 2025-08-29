@@ -126,6 +126,10 @@ final class ConjunctionDISI extends FilterDocIdSetIterator {
     DocIdSetIterator disi;
     if (iterators.size() == 1) {
       disi = iterators.get(0);
+    } else if (iterators.size() == 2) {
+      // Optimize for common two-iterator case
+      CollectionUtil.timSort(iterators, (o1, o2) -> Long.compare(o1.cost(), o2.cost()));
+      disi = new TwoIteratorConjunctionDISI(iterators.get(0), iterators.get(1));
     } else {
       // Sort the list first to allow the sparser iterator to lead the matching.
       CollectionUtil.timSort(iterators, (o1, o2) -> Long.compare(o1.cost(), o2.cost()));
@@ -220,6 +224,43 @@ final class ConjunctionDISI extends FilterDocIdSetIterator {
       iteratorsOnTheSameDoc = iteratorsOnTheSameDoc && (others[i].docID() == curDoc);
     }
     return iteratorsOnTheSameDoc;
+  }
+
+  /** Optimized conjunction for exactly two iterators. */
+  private static final class TwoIteratorConjunctionDISI extends FilterDocIdSetIterator {
+    private final DocIdSetIterator lead, other;
+
+    TwoIteratorConjunctionDISI(DocIdSetIterator lead, DocIdSetIterator other) {
+      super(lead);
+      this.lead = lead;
+      this.other = other;
+    }
+
+    @Override
+    public int nextDoc() throws IOException {
+      return doNext(lead.nextDoc());
+    }
+
+    @Override
+    public int advance(int target) throws IOException {
+      return doNext(lead.advance(target));
+    }
+
+    private int doNext(int doc) throws IOException {
+      for (; ; ) {
+        if (doc == NO_MORE_DOCS) {
+          return NO_MORE_DOCS;
+        }
+        final int otherDoc = other.advance(doc);
+        if (otherDoc == doc) {
+          return doc;
+        }
+        if (otherDoc == NO_MORE_DOCS) {
+          return NO_MORE_DOCS;
+        }
+        doc = lead.advance(otherDoc);
+      }
+    }
   }
 
   /** Conjunction between a {@link DocIdSetIterator} and one or more {@link BitSetIterator}s. */
