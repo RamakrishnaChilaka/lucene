@@ -21,9 +21,9 @@ import org.apache.lucene.util.NumericUtils;
 import org.apache.lucene.util.TernaryLongHeap;
 
 /**
- * NeighborQueue uses a {@link TernaryLongHeap} to store lists of arcs in an HNSW graph, represented as a
- * neighbor node id with an associated score packed together as a sortable long, which is sorted
- * primarily by score. The queue provides both fixed-size and unbounded operations via {@link
+ * NeighborQueue uses a {@link TernaryLongHeap} to store lists of arcs in an HNSW graph, represented
+ * as a neighbor node id with an associated score packed together as a sortable long, which is
+ * sorted primarily by score. The queue provides both fixed-size and unbounded operations via {@link
  * #insertWithOverflow(int, float)} and {@link #add(int, float)}, and provides MIN and MAX heap
  * subclasses.
  */

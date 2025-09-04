@@ -30,6 +30,7 @@ public final class FloatHeap {
   private final int maxSize;
   private final float[] heap;
   private int size;
+  private final int arity = 3;
 
   public FloatHeap(int maxSize) {
     this.maxSize = maxSize;
@@ -117,33 +118,75 @@ public final class FloatHeap {
     return heap[1];
   }
 
-  private void downHeap(int i) {
-    float value = heap[i]; // save top value
-    int j = i << 1; // find smaller child
-    int k = j + 1;
-    if (k <= size && heap[k] < heap[j]) {
-      j = k;
-    }
-    while (j <= size && heap[j] < value) {
-      heap[i] = heap[j]; // shift up child
-      i = j;
-      j = i << 1;
-      k = j + 1;
-      if (k <= size && heap[k] < heap[j]) {
-        j = k;
-      }
+  //  private void downHeap(int i) {
+  //    float value = heap[i]; // save top value
+  //    int j = i << 1; // find smaller child
+  //    int k = j + 1;
+  //    if (k <= size && heap[k] < heap[j]) {
+  //      j = k;
+  //    }
+  //    while (j <= size && heap[j] < value) {
+  //      heap[i] = heap[j]; // shift up child
+  //      i = j;
+  //      j = i << 1;
+  //      k = j + 1;
+  //      if (k <= size && heap[k] < heap[j]) {
+  //        j = k;
+  //      }
+  //    }
+  //    heap[i] = value; // install saved value
+  //  }
+  //
+  //  private void upHeap(int origPos) {
+  //    int i = origPos;
+  //    float value = heap[i]; // save bottom value
+  //    int j = i >>> 1;
+  //    while (j > 0 && value < heap[j]) {
+  //      heap[i] = heap[j]; // shift parents down
+  //      i = j;
+  //      j = j >>> 1;
+  //    }
+  //    heap[i] = value; // install saved value
+  //  }
+
+  private void upHeap(int i) {
+    final float value = heap[i]; // save bottom value
+    while (i > 1) {
+      // parent formula for 1-based indexing
+      final int parent = ((i - 2) / arity) + 1;
+      final float parentVal = heap[parent];
+      if (value >= parentVal) break;
+      heap[i] = parentVal; // shift parent down
+      i = parent;
     }
     heap[i] = value; // install saved value
   }
 
-  private void upHeap(int origPos) {
-    int i = origPos;
-    float value = heap[i]; // save bottom value
-    int j = i >>> 1;
-    while (j > 0 && value < heap[j]) {
-      heap[i] = heap[j]; // shift parents down
-      i = j;
-      j = j >>> 1;
+  private void downHeap(int i) {
+    float value = heap[i]; // save top value
+    for (; ; ) {
+      // first child formula for 1-based indexing
+      int firstChild = arity * (i - 1) + 2;
+      if (firstChild > size) break; // i is a leaf
+
+      int lastChild = Math.min(firstChild + arity - 1, size);
+
+      // find the smallest child in [firstChild, lastChild]
+      int best = firstChild;
+      float bestVal = heap[firstChild];
+
+      for (int c = firstChild + 1; c <= lastChild; c++) {
+        final float v = heap[c];
+        if (v < bestVal) {
+          bestVal = v;
+          best = c;
+        }
+      }
+
+      if (bestVal >= value) break;
+
+      heap[i] = bestVal;
+      i = best;
     }
     heap[i] = value; // install saved value
   }
