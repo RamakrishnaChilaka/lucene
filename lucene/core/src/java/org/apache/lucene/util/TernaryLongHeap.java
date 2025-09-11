@@ -218,24 +218,32 @@ public final class TernaryLongHeap {
    * @param size the current size of the heap
    * @param arity the number of children each node can have
    */
+  // Specialized downHeap for a 3-ary heap, 1-based indexing
   static void downHeap(long[] heap, int i, int size, int arity) {
-    long value = heap[i]; // save top value
+    long value = heap[i];
     for (; ; ) {
-      // first child formula for 1-based indexing
-      int firstChild = arity * (i - 1) + 2;
-      if (firstChild > size) break; // i is a leaf
+      // first child index
+      int c1 = 3 * (i - 1) + 2;
+      if (c1 > size) break; // no children
 
-      int lastChild = Math.min(firstChild + arity - 1, size);
+      int best = c1;
+      long bestVal = heap[c1];
 
-      // find the smallest child in [firstChild, lastChild]
-      int best = firstChild;
-      long bestVal = heap[firstChild];
+      int c2 = c1 + 1;
+      if (c2 <= size) {
+        long v2 = heap[c2];
+        if (v2 < bestVal) {
+          bestVal = v2;
+          best = c2;
+        }
+      }
 
-      for (int c = firstChild + 1; c <= lastChild; c++) {
-        final long v = heap[c];
-        if (v < bestVal) {
-          bestVal = v;
-          best = c;
+      int c3 = c1 + 2;
+      if (c3 <= size) {
+        long v3 = heap[c3];
+        if (v3 < bestVal) {
+          bestVal = v3;
+          best = c3;
         }
       }
 
@@ -244,6 +252,6 @@ public final class TernaryLongHeap {
       heap[i] = bestVal;
       i = best;
     }
-    heap[i] = value; // install saved value
+    heap[i] = value;
   }
 }

@@ -484,8 +484,10 @@ public final class Lucene90CompressingStoredFieldsReader extends StoredFieldsRea
         // The stream encodes the length of each document and we decode
         // it into a list of monotonically increasing offsets
         StoredFieldsInts.readInts(fieldsStream, chunkDocs, offsets, 1);
-        for (int i = 0; i < chunkDocs; ++i) {
-          offsets[i + 1] += offsets[i];
+        long sum = 0;
+        for (int i = 0; i <= chunkDocs; ++i) {
+          sum += offsets[i];
+          offsets[i] = sum;
         }
 
         // Additional validation: only the empty document has a serialized length of 0
