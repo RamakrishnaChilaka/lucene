@@ -915,44 +915,28 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
 
   @Override
   public int sumOverRange(int[] arr, int start, int end) {
-    int i = start;
     int sum = 0;
+    int i = start;
 
-    // only vectorize if the range is large enough to benefit from vectorization
-    if (end - start > 2 * INT_SPECIES.length()) {
-      int vectorLimit = start + INT_SPECIES.loopBound(end - start);
-      sum += sumOverRangeBody(arr, start, vectorLimit);
-      i = vectorLimit;
+    final int len = end - start;
+
+    if (len >= 4 * INT_SPECIES.length()) {
+      // vector accumulators
+      IntVector acc = IntVector.zero(INT_SPECIES);
+
+      int limit = start + (len & ~(INT_SPECIES.length() - 1)); // round down to multiple of species length
+      for (; i < limit; i += INT_SPECIES.length()) {
+        acc = acc.add(IntVector.fromArray(INT_SPECIES, arr, i));
+      }
+      sum += acc.reduceLanes(ADD);
     }
 
     // scalar tail
     for (; i < end; i++) {
       sum += arr[i];
     }
-    return sum;
-  }
 
-  /** vectorized sum over range body */
-  private int sumOverRangeBody(int[] arr, int start, int limit) {
-    int i = start;
-    // vector loop is unrolled 4x (4 accumulators in parallel)
-    IntVector acc1 = IntVector.zero(INT_SPECIES);
-    IntVector acc2 = IntVector.zero(INT_SPECIES);
-    IntVector acc3 = IntVector.zero(INT_SPECIES);
-    IntVector acc4 = IntVector.zero(INT_SPECIES);
-    int unrolledLimit = limit - 3 * INT_SPECIES.length();
-    for (; i < unrolledLimit; i += 4 * INT_SPECIES.length()) {
-      acc1 = acc1.add(IntVector.fromArray(INT_SPECIES, arr, i));
-      acc2 = acc2.add(IntVector.fromArray(INT_SPECIES, arr, i + INT_SPECIES.length()));
-      acc3 = acc3.add(IntVector.fromArray(INT_SPECIES, arr, i + 2 * INT_SPECIES.length()));
-      acc4 = acc4.add(IntVector.fromArray(INT_SPECIES, arr, i + 3 * INT_SPECIES.length()));
-    }
-    // vector tail
-    for (; i < limit; i += INT_SPECIES.length()) {
-      acc1 = acc1.add(IntVector.fromArray(INT_SPECIES, arr, i));
-    }
-    // reduce
-    return acc1.add(acc2).add(acc3).add(acc4).reduceLanes(ADD);
+    return sum;
   }
 
   @Override
