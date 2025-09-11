@@ -268,11 +268,7 @@ public final class Lucene104PostingsReader extends PostingsReaderBase {
   }
 
   private static int sumOverRange(int[] arr, int start, int end) {
-    int res = 0;
-    for (int i = start; i < end; i++) {
-      res += arr[i];
-    }
-    return res;
+    return VectorUtil.sumOverRange(arr, start, end);
   }
 
   final class BlockPostingsEnum extends ImpactsEnum {
