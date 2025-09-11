@@ -232,6 +232,15 @@ final class DefaultVectorUtilSupport implements VectorUtilSupport {
   }
 
   @Override
+  public int sumOverRange(int[] arr, int start, int end) {
+    int res = 0;
+    for (int i = start; i < end; i++) {
+      res += arr[i];
+    }
+    return res;
+  }
+
+  @Override
   public long int4BitDotProduct(byte[] int4Quantized, byte[] binaryQuantized) {
     return int4BitDotProductImpl(int4Quantized, binaryQuantized);
   }

@@ -914,6 +914,22 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
   }
 
   @Override
+  public int sumOverRange(int[] arr, int start, int end) {
+    IntVector.Species SPECIES = IntVector.SPECIES_PREFERRED;
+    IntVector sumVec = IntVector.zero(SPECIES);
+    int i = start;
+
+    for (; i <= end - SPECIES.length(); i += SPECIES.length()) {
+      IntVector vec = IntVector.fromArray(SPECIES, arr, i);
+      sumVec = sumVec.add(vec);
+    }
+
+    int sum = sumVec.reduceLanes(VectorOperators.ADD);
+    for (; i < end; i++) sum += arr[i];
+    return sum;
+  }
+
+  @Override
   public long int4BitDotProduct(byte[] q, byte[] d) {
     assert q.length == d.length * 4;
     // 128 / 8 == 16

@@ -59,6 +59,8 @@ public interface VectorUtilSupport {
    */
   int findNextGEQ(int[] buffer, int target, int from, int to);
 
+  int sumOverRange(int[] arr, int start, int end);
+
   /**
    * Compute the dot product between a quantized int4 vector and a binary quantized vector. It is
    * assumed that the int4 quantized bits are packed in the byte array in the same way as the {@link

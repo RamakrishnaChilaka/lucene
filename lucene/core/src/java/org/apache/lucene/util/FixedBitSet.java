@@ -837,9 +837,23 @@ public final class FixedBitSet extends BitSet {
    */
   public void setBulk(int[] indices, int start, int end, int offset) {
     final long[] bits = this.bits;
-    for (int i = start; i < end; i++) {
+    int i = start;
+
+    while (i < end) {
       int bitIndex = indices[i] - offset;
-      bits[bitIndex >> 6] |= 1L << bitIndex;
+      int wordIndex = bitIndex >> 6;
+      long word = bits[wordIndex]; // read once
+
+      // accumulate all bits in the same word
+      do {
+        int bitInWord = bitIndex & 63;
+        word |= 1L << bitInWord;
+        i++;
+        if (i >= end) break;
+        bitIndex = indices[i] - offset;
+      } while ((bitIndex >> 6) == wordIndex);
+
+      bits[wordIndex] = word; // write once per word
     }
   }
 

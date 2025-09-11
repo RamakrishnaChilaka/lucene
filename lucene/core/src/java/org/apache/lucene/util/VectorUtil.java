@@ -368,6 +368,10 @@ public final class VectorUtil {
     return IMPL.findNextGEQ(buffer, target, from, to);
   }
 
+  public static int sumOverRange(int[] arr, int start, int end) {
+   return IMPL.sumOverRange(arr, start, end);
+  }
+
   /**
    * Scalar quantizes {@code vector}, putting the result into {@code dest}.
    *
