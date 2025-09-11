@@ -1088,11 +1088,12 @@ public final class Lucene104PostingsReader extends PostingsReaderBase {
 
     private void bufferIntoBitSet(int start, int end, FixedBitSet bitSet, int offset)
         throws IOException {
-      // bitSet#set and `doc - offset` get auto-vectorized
-      for (int i = start; i < end; ++i) {
-        int doc = docBuffer[i];
-        bitSet.set(doc - offset);
-      }
+      bitSet.setBulk(docBuffer, start, end, offset);
+      //      // bitSet#set and `doc - offset` get auto-vectorized
+      //      for (int i = start; i < end; ++i) {
+      //        int doc = docBuffer[i];
+      //        bitSet.set(doc - offset);
+      //      }
     }
 
     @Override

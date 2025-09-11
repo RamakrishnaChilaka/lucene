@@ -827,6 +827,28 @@ public final class FixedBitSet extends BitSet {
   }
 
   /**
+   * Bulk set multiple bits from an array of indices with an offset applied. This is optimized for
+   * setting many bits at once, avoiding individual set() calls.
+   *
+   * @param indices array of bit indices to set
+   * @param start start index in the indices array
+   * @param end end index in the indices array (exclusive)
+   * @param offset offset to subtract from each index
+   */
+  public void setBulk(int[] indices, int start, int end, int offset) {
+    // Group indices by word to minimize memory access
+    //    int wordNum = index >> 6; // div 64
+    //    long bitmask = 1L << index;
+    //    bits[wordNum] |= bitmask;
+    for (int i = start; i < end; i++) {
+      int bitIndex = indices[i] - offset;
+      int wordNum = bitIndex >> 6;
+      long bitmask = 1L << bitIndex;
+      bits[wordNum] |= bitmask;
+    }
+  }
+
+  /**
    * For each set bit from {@code from} inclusive to {@code to} exclusive, add {@code base} to the
    * bit index and call {@code consumer} on it. This is internally used by queries that use bit sets
    * as intermediate representations of their matches.
