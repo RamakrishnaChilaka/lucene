@@ -72,6 +72,7 @@ public class PriorityQueue<T> implements Iterable<T> {
   private final int maxSize;
   private final T[] heap;
   private final LessThan<? super T> lessThan;
+  private static final int ARITY = 3;
 
   /** Create an empty priority queue of the configured size using the specified {@link LessThan}. */
   public PriorityQueue(int maxSize, LessThan<? super T> lessThan) {
@@ -170,7 +171,7 @@ public class PriorityQueue<T> implements Iterable<T> {
     }
 
     // The loop goes down to 1 as heap is 1-based not 0-based.
-    for (int i = (size >>> 1); i >= 1; i--) {
+    for (int i = (size / ARITY); i >= 1; i--) {
       downHeap(i);
     }
   }
@@ -323,11 +324,11 @@ public class PriorityQueue<T> implements Iterable<T> {
   private boolean upHeap(int origPos) {
     int i = origPos;
     T node = heap[i]; // save bottom node
-    int j = i >>> 1;
-    while (j > 0 && lessThan.lessThan(node, heap[j])) {
-      heap[i] = heap[j]; // shift parents down
-      i = j;
-      j = j >>> 1;
+    while (i > 1) {
+      int parent = ((i - 2) / ARITY) + 1; // ternary heap parent formula
+      if (!lessThan.lessThan(node, heap[parent])) break;
+      heap[i] = heap[parent]; // shift parent down
+      i = parent;
     }
     heap[i] = node; // install saved node
     return i != origPos;
@@ -335,19 +336,27 @@ public class PriorityQueue<T> implements Iterable<T> {
 
   private void downHeap(int i) {
     T node = heap[i]; // save top node
-    int j = i << 1; // find smaller child
-    int k = j + 1;
-    if (k <= size && lessThan.lessThan(heap[k], heap[j])) {
-      j = k;
-    }
-    while (j <= size && lessThan.lessThan(heap[j], node)) {
-      heap[i] = heap[j]; // shift up child
-      i = j;
-      j = i << 1;
-      k = j + 1;
-      if (k <= size && lessThan.lessThan(heap[k], heap[j])) {
-        j = k;
+    for (; ; ) {
+      int firstChild = ARITY * (i - 1) + 2; // ternary heap first child formula
+      if (firstChild > size) break; // i is a leaf
+
+      int lastChild = Math.min(firstChild + ARITY - 1, size);
+
+      // find the smallest child in [firstChild, lastChild]
+      int child = firstChild;
+      T childNode = heap[firstChild];
+
+      for (int c = firstChild + 1; c <= lastChild; c++) {
+        if (lessThan.lessThan(heap[c], childNode)) {
+          childNode = heap[c];
+          child = c;
+        }
       }
+
+      if (!lessThan.lessThan(childNode, node)) break;
+
+      heap[i] = childNode;
+      i = child;
     }
     heap[i] = node; // install saved node
   }
