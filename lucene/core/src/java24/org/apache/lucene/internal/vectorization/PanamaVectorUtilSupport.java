@@ -39,6 +39,7 @@ import jdk.incubator.vector.Vector;
 import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorShape;
+import jdk.incubator.vector.VectorShuffle;
 import jdk.incubator.vector.VectorSpecies;
 import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.SuppressForbidden;
@@ -112,8 +113,9 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
 
     // if the array size is large (> 2x platform vector size), it's worth the overhead to vectorize
     if (a.length > 2 * FLOAT_SPECIES.length()) {
-      i += FLOAT_SPECIES.loopBound(a.length);
-      res += dotProductBody(a, b, i);
+      int limit = FLOAT_SPECIES.loopBound(a.length);
+      res += dotProductBody(a, b, limit);
+      i = limit;
     }
 
     // scalar tail
@@ -175,11 +177,12 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
 
     // if the array size is large (> 2x platform vector size), it's worth the overhead to vectorize
     if (a.length > 2 * FLOAT_SPECIES.length()) {
-      i += FLOAT_SPECIES.loopBound(a.length);
-      float[] ret = cosineBody(a, b, i);
+      int limit = FLOAT_SPECIES.loopBound(a.length);
+      float[] ret = cosineBody(a, b, limit);
       sum += ret[0];
       norm1 += ret[1];
       norm2 += ret[2];
+      i = limit;
     }
 
     // scalar tail
@@ -240,8 +243,9 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
 
     // if the array size is large (> 2x platform vector size), it's worth the overhead to vectorize
     if (a.length > 2 * FLOAT_SPECIES.length()) {
-      i += FLOAT_SPECIES.loopBound(a.length);
-      res += squareDistanceBody(a, b, i);
+      int limit = FLOAT_SPECIES.loopBound(a.length);
+      res += squareDistanceBody(a, b, limit);
+      i = limit;
     }
 
     // scalar tail
@@ -548,7 +552,7 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         acc1 = acc1.add(prod16a);
       }
       IntVector intAcc0 = acc0.convertShape(S2I, IntVector.SPECIES_512, 0).reinterpretAsInts();
-      IntVector intAcc1 = acc0.convertShape(S2I, IntVector.SPECIES_512, 1).reinterpretAsInts();
+      IntVector intAcc1 = acc1.convertShape(S2I, IntVector.SPECIES_512, 1).reinterpretAsInts();
       IntVector intAcc2 = acc1.convertShape(S2I, IntVector.SPECIES_512, 0).reinterpretAsInts();
       IntVector intAcc3 = acc1.convertShape(S2I, IntVector.SPECIES_512, 1).reinterpretAsInts();
       sum += intAcc0.add(intAcc1).add(intAcc2).add(intAcc3).reduceLanes(ADD);
@@ -581,7 +585,7 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         acc1 = acc1.add(prod16a);
       }
       IntVector intAcc0 = acc0.convertShape(S2I, IntVector.SPECIES_256, 0).reinterpretAsInts();
-      IntVector intAcc1 = acc0.convertShape(S2I, IntVector.SPECIES_256, 1).reinterpretAsInts();
+      IntVector intAcc1 = acc1.convertShape(S2I, IntVector.SPECIES_256, 1).reinterpretAsInts();
       IntVector intAcc2 = acc1.convertShape(S2I, IntVector.SPECIES_256, 0).reinterpretAsInts();
       IntVector intAcc3 = acc1.convertShape(S2I, IntVector.SPECIES_256, 1).reinterpretAsInts();
       sum += intAcc0.add(intAcc1).add(intAcc2).add(intAcc3).reduceLanes(ADD);
@@ -617,7 +621,7 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         acc1 = acc1.add(prod16.and((short) 0xFF));
       }
       IntVector intAcc0 = acc0.convertShape(S2I, IntVector.SPECIES_128, 0).reinterpretAsInts();
-      IntVector intAcc1 = acc0.convertShape(S2I, IntVector.SPECIES_128, 1).reinterpretAsInts();
+      IntVector intAcc1 = acc1.convertShape(S2I, IntVector.SPECIES_128, 1).reinterpretAsInts();
       IntVector intAcc2 = acc1.convertShape(S2I, IntVector.SPECIES_128, 0).reinterpretAsInts();
       IntVector intAcc3 = acc1.convertShape(S2I, IntVector.SPECIES_128, 1).reinterpretAsInts();
       sum += intAcc0.add(intAcc1).add(intAcc2).add(intAcc3).reduceLanes(ADD);
@@ -647,7 +651,7 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         acc1 = acc1.add(prod16.and((short) 0xFF));
       }
       IntVector intAcc0 = acc0.convertShape(S2I, IntVector.SPECIES_128, 0).reinterpretAsInts();
-      IntVector intAcc1 = acc0.convertShape(S2I, IntVector.SPECIES_128, 1).reinterpretAsInts();
+      IntVector intAcc1 = acc1.convertShape(S2I, IntVector.SPECIES_128, 1).reinterpretAsInts();
       IntVector intAcc2 = acc1.convertShape(S2I, IntVector.SPECIES_128, 0).reinterpretAsInts();
       IntVector intAcc3 = acc1.convertShape(S2I, IntVector.SPECIES_128, 1).reinterpretAsInts();
       sum += intAcc0.add(intAcc1).add(intAcc2).add(intAcc3).reduceLanes(ADD);
@@ -939,6 +943,60 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
     return sum;
   }
 
+  private static IntVector prefixLocal(IntVector v) {
+    // shift 1 lane (4 bytes)  → adds element i-1
+    v = v.add(v.rearrange(SHIFT1));
+    // shift 2 lanes (8 bytes) → adds element i-2
+    v = v.add(v.rearrange(SHIFT2));
+    // shift 4 lanes (16 bytes)→ adds element i-4
+    v = v.add(v.rearrange(SHIFT4));
+    return v;
+  }
+  // Constants for prefix sum implementation
+  private static final int BLOCK = 256;
+
+  /* pre-build the shuffle tables once */
+  private static final VectorShuffle<Integer> SHIFT1 =
+      VectorShuffle.fromValues(INT_SPECIES, -1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14);
+  private static final VectorShuffle<Integer> SHIFT2 =
+      VectorShuffle.fromValues(INT_SPECIES, -1,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13);
+  private static final VectorShuffle<Integer> SHIFT4 =
+      VectorShuffle.fromValues(INT_SPECIES, -1,-1,-1,-1,0,1,2,3,4,5,6,7,8,9,10,11);
+
+  /* --------------------------------------------------
+     2.  Accumulate phase – add carry ‘s’ to block
+     -------------------------------------------------- */
+  private static int accumulate(int[] a, int off, int s) {
+    IntVector sum = IntVector.broadcast(INT_SPECIES, s);
+    for (int i = 0; i < BLOCK; i += INT_SPECIES.length()) {
+      IntVector v = IntVector.fromArray(INT_SPECIES, a, off + i);
+      v = v.add(sum);
+      v.intoArray(a, off + i);
+      sum = v.rearrange(VectorShuffle.fromValues(INT_SPECIES,
+          INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,
+          INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,
+          INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,
+          INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1,INT_SPECIES.length()-1)); // broadcast last
+    }
+    return sum.lane(0); // new carry
+  }
+
+  public static void prefix(int[] a) {
+    int i = 0;
+    /* ---- pass 1 : local scan ---------------------------- */
+    for (; i + INT_SPECIES.length() <= a.length; i += INT_SPECIES.length())
+      prefixLocal(IntVector.fromArray(INT_SPECIES, a, i))
+          .intoArray(a, i);
+    /* scalar tail */
+    for (; i < a.length; i++)
+      a[i] += a[i - 1];
+
+    /* ---- pass 2 : blocked accumulate ------------------- */
+    int carry = 0;
+    for (i = BLOCK; i < a.length; i += BLOCK)
+      carry = accumulate(a, i, carry);
+  }
+
   @Override
   public long int4BitDotProduct(byte[] q, byte[] d) {
     assert q.length == d.length * 4;
@@ -1198,8 +1256,9 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
 
     // if the array size is large (> 2x platform vector size), it's worth the overhead to vectorize
     if (v.length > 2 * FLOAT_SPECIES.length()) {
-      i += FLOAT_SPECIES.loopBound(v.length);
-      l2normalizeBody(v, invNorm, i);
+      int limit = FLOAT_SPECIES.loopBound(v.length);
+      l2normalizeBody(v, invNorm, limit);
+      i = limit;
     }
 
     for (; i < v.length; i++) {
