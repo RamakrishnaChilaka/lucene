@@ -836,15 +836,10 @@ public final class FixedBitSet extends BitSet {
    * @param offset offset to subtract from each index
    */
   public void setBulk(int[] indices, int start, int end, int offset) {
-    // Group indices by word to minimize memory access
-    //    int wordNum = index >> 6; // div 64
-    //    long bitmask = 1L << index;
-    //    bits[wordNum] |= bitmask;
+    final long[] bits = this.bits;
     for (int i = start; i < end; i++) {
       int bitIndex = indices[i] - offset;
-      int wordNum = bitIndex >> 6;
-      long bitmask = 1L << bitIndex;
-      bits[wordNum] |= bitmask;
+      bits[bitIndex >> 6] |= 1L << bitIndex;
     }
   }
 
