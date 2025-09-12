@@ -435,7 +435,7 @@ public class Lucene104PostingsWriter extends PushPostingsWriterBase {
       int docRange = lastDocID - level0LastDocID;
       assert docRange == Arrays.stream(docDeltaBuffer).sum();
       int numBitSetLongs = FixedBitSet.bits2words(docRange);
-      int numBitsNextBitsPerValue = Math.min(Integer.SIZE, bitsPerValue + 1) * BLOCK_SIZE;
+      int numBitsNextBitsPerValue = Math.min(Integer.SIZE, bitsPerValue + 2) * BLOCK_SIZE;
       if (docRange == BLOCK_SIZE) {
         level0Output.writeByte((byte) 0);
       } else if (numBitsNextBitsPerValue <= docRange) {
