@@ -198,10 +198,10 @@ public final class Lucene104PostingsReader extends PostingsReaderBase {
     }
   }
 
-  static void prefixSum_scalar_v4(int[] d) {
+  static void prefixSum_scalar_v4(int[] d, int base) {
 
     /* ----- prologue : first 4 values ----- */
-    int s0 = d[0];
+    int s0 = d[0] + base;
     int s1 = s0 + d[1];
     int s2 = s1 + d[2];
     int s3 = s2 + d[3];
