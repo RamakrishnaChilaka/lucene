@@ -198,6 +198,32 @@ public final class Lucene104PostingsReader extends PostingsReaderBase {
     }
   }
 
+  static void prefixSum_scalar_v4(int[] d) {
+
+    /* ----- prologue : first 4 values ----- */
+    int s0 = d[0];
+    int s1 = s0 + d[1];
+    int s2 = s1 + d[2];
+    int s3 = s2 + d[3];
+    d[0] = s0;
+    d[1] = s1;
+    d[2] = s2;
+    d[3] = s3;
+
+    /* ----- hot loop : 4× unrolled ----- */
+    for (int i = 4; i < 256; i += 4) {
+      s0 = s3 + d[i];      // new lane 0
+      s1 = s0 + d[i + 1];  // new lane 1
+      s2 = s1 + d[i + 2];  // new lane 2
+      s3 = s2 + d[i + 3];  // new lane 3
+
+      d[i]     = s0;
+      d[i + 1] = s1;
+      d[i + 2] = s2;
+      d[i + 3] = s3;
+    }
+  }
+
   @Override
   public BlockTermState newTermState() {
     return new IntBlockTermState();
@@ -594,7 +620,7 @@ public final class Lucene104PostingsReader extends PostingsReaderBase {
       if (bitsPerValue > 0) {
         // block is encoded as 256 packed integers that record the delta between doc IDs
         forUtil.decode(bitsPerValue, docInUtil, docBuffer);
-        prefixSum(docBuffer, BLOCK_SIZE, prevDocID);
+        prefixSum_scalar_v4(docBuffer);
         encoding = DeltaEncoding.PACKED;
       } else {
         // block is encoded as a bit set
