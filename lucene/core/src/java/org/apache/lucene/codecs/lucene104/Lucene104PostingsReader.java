@@ -620,7 +620,7 @@ public final class Lucene104PostingsReader extends PostingsReaderBase {
       if (bitsPerValue > 0) {
         // block is encoded as 256 packed integers that record the delta between doc IDs
         forUtil.decode(bitsPerValue, docInUtil, docBuffer);
-        prefixSum_scalar_v4(docBuffer);
+        prefixSum_scalar_v4(docBuffer, prevDocID);
         encoding = DeltaEncoding.PACKED;
       } else {
         // block is encoded as a bit set
