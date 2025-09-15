@@ -8,9 +8,9 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS IS"
+ * BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
@@ -116,6 +116,13 @@ public final class DirectMonotonicReader extends LongValues {
   private final float[] avgs;
   private final byte[] bpvs;
 
+  // --- cache for sequential access optimisation ---
+  private int cachedBlock = -1;
+  private LongValues cachedReader;
+  private long cachedMin;
+  private float cachedAvg;
+  private long cachedBase;
+
   private DirectMonotonicReader(
       int blockShift, LongValues[] readers, long[] mins, float[] avgs, byte[] bpvs) {
     this.blockShift = blockShift;
@@ -134,9 +141,19 @@ public final class DirectMonotonicReader extends LongValues {
   @Override
   public long get(long index) {
     final int block = (int) (index >>> blockShift);
-    final long blockIndex = index & blockMask;
-    final long delta = readers[block].get(blockIndex);
-    return mins[block] + (long) (avgs[block] * blockIndex) + delta;
+
+    // reuse cached block if possible
+    if (block != cachedBlock) {
+      cachedBlock = block;
+      cachedReader = readers[block];
+      cachedMin = mins[block];
+      cachedAvg = avgs[block];
+      cachedBase = (long) block << blockShift;
+    }
+
+    final long blockIndex = index - cachedBase;
+    final long delta = cachedReader.get(blockIndex);
+    return cachedMin + (long) (cachedAvg * blockIndex) + delta;
   }
 
   /** Get lower/upper bounds for the value at a given index without hitting the direct reader. */
