@@ -94,6 +94,25 @@ public class TopScoreDocCollector extends TopDocsCollector<ScoreDoc> {
       public void collect(int doc) throws IOException {
         float score = scorer.score();
 
+        // Fast path: check competitiveness first to avoid unnecessary work
+        if (score <= topScore) {
+          // Note: for queries that match lots of hits, this is the common case: most hits are not
+          // competitive.
+          int hitCountSoFar = ++totalHits;
+
+          if (hitCountSoFar == totalHitsThreshold + 1) {
+            // we just exceeded totalHitsThreshold, we can start setting the min
+            // competitive score now
+            updateMinCompetitiveScore(scorer);
+          }
+
+          // Check global min score update less frequently for non-competitive hits
+          if (minScoreAcc != null && (hitCountSoFar & minScoreAcc.modInterval) == 0) {
+            updateGlobalMinCompetitiveScore(scorer);
+          }
+          return;
+        }
+
         int hitCountSoFar = ++totalHits;
 
         if (minScoreAcc != null && (hitCountSoFar & minScoreAcc.modInterval) == 0) {
@@ -110,21 +129,7 @@ public class TopScoreDocCollector extends TopDocsCollector<ScoreDoc> {
           return;
         }
 
-        if (score <= topScore) {
-          // Note: for queries that match lots of hits, this is the common case: most hits are not
-          // competitive.
-          if (hitCountSoFar == totalHitsThreshold + 1) {
-            // we just exceeded totalHitsThreshold, we can start setting the min
-            // competitive score now
-            updateMinCompetitiveScore(scorer);
-          }
-
-          // Since docs are returned in-order (i.e., increasing doc Id), a document
-          // with equal score to pqTop.score cannot compete since HitQueue favors
-          // documents with lower doc Ids. Therefore reject those docs too.
-        } else {
-          collectCompetitiveHit(doc, score);
-        }
+        collectCompetitiveHit(doc, score);
       }
 
       private void collectCompetitiveHit(int doc, float score) throws IOException {
