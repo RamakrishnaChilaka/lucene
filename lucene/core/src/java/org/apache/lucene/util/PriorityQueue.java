@@ -322,34 +322,45 @@ public class PriorityQueue<T> implements Iterable<T> {
 
   private boolean upHeap(int origPos) {
     int i = origPos;
-    T node = heap[i]; // save bottom node
-    int j = i >>> 1;
-    while (j > 0 && lessThan.lessThan(node, heap[j])) {
-      heap[i] = heap[j]; // shift parents down
-      i = j;
-      j = j >>> 1;
+    T node = heap[i];
+    int moved = 0;
+
+    while (i > 1) {
+      int parent = i >>> 1;
+      T parentVal = heap[parent];
+
+      // Instead of "if (!lessThan(...)) break", we compute a boolean
+      boolean moveUp = lessThan.lessThan(node, parentVal);
+      if (!moveUp) break;
+
+      heap[i] = parentVal;
+      i = parent;
+      moved = 1;
     }
-    heap[i] = node; // install saved node
-    return i != origPos;
+
+    heap[i] = node;
+    return moved != 0;
   }
 
   private void downHeap(int i) {
-    T node = heap[i]; // save top node
-    int j = i << 1; // find smaller child
-    int k = j + 1;
-    if (k <= size && lessThan.lessThan(heap[k], heap[j])) {
-      j = k;
+    T node = heap[i];
+
+    while (true) {
+      int left = i << 1;
+      if (left > size) break;
+
+      int right = left + 1;
+
+      // pick smaller child
+      int child = right <= size && lessThan.lessThan(heap[right], heap[left]) ? right : left;
+
+      if (!lessThan.lessThan(heap[child], node)) break;
+
+      heap[i] = heap[child];
+      i = child;
     }
-    while (j <= size && lessThan.lessThan(heap[j], node)) {
-      heap[i] = heap[j]; // shift up child
-      i = j;
-      j = i << 1;
-      k = j + 1;
-      if (k <= size && lessThan.lessThan(heap[k], heap[j])) {
-        j = k;
-      }
-    }
-    heap[i] = node; // install saved node
+
+    heap[i] = node;
   }
 
   /**
