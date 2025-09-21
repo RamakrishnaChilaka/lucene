@@ -293,9 +293,15 @@ public abstract class Weight implements SegmentCacheable {
     private static void scoreIterator(
         LeafCollector collector, Bits acceptDocs, DocIdSetIterator iterator, int max)
         throws IOException {
-      for (int doc = iterator.docID(); doc < max; doc = iterator.nextDoc()) {
-        if (acceptDocs == null || acceptDocs.get(doc)) {
+      if (acceptDocs == null) {
+        for (int doc = iterator.docID(); doc < max; doc = iterator.nextDoc()) {
           collector.collect(doc);
+        }
+      } else {
+        for (int doc = iterator.docID(); doc < max; doc = iterator.nextDoc()) {
+          if (acceptDocs.get(doc)) {
+            collector.collect(doc);
+          }
         }
       }
     }
@@ -307,9 +313,17 @@ public abstract class Weight implements SegmentCacheable {
         TwoPhaseIterator twoPhase,
         int max)
         throws IOException {
-      for (int doc = iterator.docID(); doc < max; doc = iterator.nextDoc()) {
-        if ((acceptDocs == null || acceptDocs.get(doc)) && twoPhase.matches()) {
-          collector.collect(doc);
+      if (acceptDocs == null) {
+        for (int doc = iterator.docID(); doc < max; doc = iterator.nextDoc()) {
+          if (twoPhase.matches()) {
+            collector.collect(doc);
+          }
+        }
+      } else {
+        for (int doc = iterator.docID(); doc < max; doc = iterator.nextDoc()) {
+          if (acceptDocs.get(doc) && twoPhase.matches()) {
+            collector.collect(doc);
+          }
         }
       }
     }
