@@ -117,34 +117,55 @@ public class IntIntHashMap implements Iterable<IntIntHashMap.IntIntCursor>, Acco
     assert assigned < mask + 1;
 
     final int mask = this.mask;
-    if (((key) == 0)) {
+    if (key == 0) {
       int previousValue = hasEmptyKey ? values[mask + 1] : 0;
       hasEmptyKey = true;
       values[mask + 1] = value;
       return previousValue;
-    } else {
-      final int[] keys = this.keys;
-      int slot = hashKey(key) & mask;
+    }
 
-      int existing;
-      while (!((existing = keys[slot]) == 0)) {
-        if (((existing) == (key))) {
-          final int previousValue = values[slot];
-          values[slot] = value;
-          return previousValue;
-        }
-        slot = (slot + 1) & mask;
-      }
+    final int[] keys = this.keys;
+    final int[] values = this.values;
+    int slot = hashKey(key) & mask;
 
+    // Fast path: check first slot directly
+    int existing = keys[slot];
+    if (existing == key) {
+      int previousValue = values[slot];
+      values[slot] = value;
+      return previousValue;
+    }
+    if (existing == 0) {
+      // Empty slot found
       if (assigned == resizeAt) {
         allocateThenInsertThenRehash(slot, key, value);
       } else {
         keys[slot] = key;
         values[slot] = value;
       }
-
       assigned++;
       return 0;
+    }
+
+    // Slow path: linear probing
+    while (true) {
+      slot = (slot + 1) & mask;
+      existing = keys[slot];
+      if (existing == key) {
+        int previousValue = values[slot];
+        values[slot] = value;
+        return previousValue;
+      }
+      if (existing == 0) {
+        if (assigned == resizeAt) {
+          allocateThenInsertThenRehash(slot, key, value);
+        } else {
+          keys[slot] = key;
+          values[slot] = value;
+        }
+        assigned++;
+        return 0;
+      }
     }
   }
 
@@ -210,12 +231,66 @@ public class IntIntHashMap implements Iterable<IntIntHashMap.IntIntCursor>, Acco
    * @return Returns the current value associated with <code>key</code> (after changes).
    */
   public int addTo(int key, int incrementValue) {
-    return putOrAdd(key, incrementValue, incrementValue);
+    assert assigned < mask + 1;
+
+    final int mask = this.mask;
+    if (key == 0) {
+      if (hasEmptyKey) {
+        values[mask + 1] += incrementValue;
+        return values[mask + 1];
+      } else {
+        hasEmptyKey = true;
+        values[mask + 1] = incrementValue;
+        return incrementValue;
+      }
+    }
+
+    final int[] keys = this.keys;
+    final int[] values = this.values;
+    int slot = hashKey(key) & mask;
+
+    // Fast path: check first slot directly
+    int existing = keys[slot];
+    if (existing == key) {
+      values[slot] += incrementValue;
+      return values[slot];
+    }
+    if (existing == 0) {
+      // Empty slot - insert new value
+      if (assigned == resizeAt) {
+        allocateThenInsertThenRehash(slot, key, incrementValue);
+      } else {
+        keys[slot] = key;
+        values[slot] = incrementValue;
+      }
+      assigned++;
+      return incrementValue;
+    }
+
+    // Slow path: linear probing
+    while (true) {
+      slot = (slot + 1) & mask;
+      existing = keys[slot];
+      if (existing == key) {
+        values[slot] += incrementValue;
+        return values[slot];
+      }
+      if (existing == 0) {
+        if (assigned == resizeAt) {
+          allocateThenInsertThenRehash(slot, key, incrementValue);
+        } else {
+          keys[slot] = key;
+          values[slot] = incrementValue;
+        }
+        assigned++;
+        return incrementValue;
+      }
+    }
   }
 
   public int remove(int key) {
     final int mask = this.mask;
-    if (((key) == 0)) {
+    if (key == 0) {
       if (!hasEmptyKey) {
         return 0;
       }
@@ -223,102 +298,125 @@ public class IntIntHashMap implements Iterable<IntIntHashMap.IntIntCursor>, Acco
       int previousValue = values[mask + 1];
       values[mask + 1] = 0;
       return previousValue;
-    } else {
-      final int[] keys = this.keys;
-      int slot = hashKey(key) & mask;
-
-      int existing;
-      while (!((existing = keys[slot]) == 0)) {
-        if (((existing) == (key))) {
-          final int previousValue = values[slot];
-          shiftConflictingKeys(slot);
-          return previousValue;
-        }
-        slot = (slot + 1) & mask;
-      }
-
-      return 0;
     }
+
+    final int[] keys = this.keys;
+    int slot = hashKey(key) & mask;
+
+    int existing;
+    while ((existing = keys[slot]) != 0) {
+      if (existing == key) {
+        final int previousValue = values[slot];
+        shiftConflictingKeys(slot);
+        return previousValue;
+      }
+      slot = (slot + 1) & mask;
+    }
+
+    return 0;
   }
 
   public int get(int key) {
-    if (((key) == 0)) {
+    if (key == 0) {
       return hasEmptyKey ? values[mask + 1] : 0;
-    } else {
-      final int[] keys = this.keys;
-      final int mask = this.mask;
-      int slot = hashKey(key) & mask;
+    }
 
-      int existing;
-      while (!((existing = keys[slot]) == 0)) {
-        if (((existing) == (key))) {
-          return values[slot];
-        }
-        slot = (slot + 1) & mask;
-      }
+    final int[] keys = this.keys;
+    final int[] values = this.values;
+    final int mask = this.mask;
+    int slot = hashKey(key) & mask;
 
+    // Fast path: check first slot directly
+    int existing = keys[slot];
+    if (existing == key) {
+      return values[slot];
+    }
+    if (existing == 0) {
       return 0;
+    }
+
+    // Slow path: linear probing
+    while (true) {
+      slot = (slot + 1) & mask;
+      existing = keys[slot];
+      if (existing == key) {
+        return values[slot];
+      }
+      if (existing == 0) {
+        return 0;
+      }
     }
   }
 
   public int getOrDefault(int key, int defaultValue) {
-    if (((key) == 0)) {
+    if (key == 0) {
       return hasEmptyKey ? values[mask + 1] : defaultValue;
-    } else {
-      final int[] keys = this.keys;
-      final int mask = this.mask;
-      int slot = hashKey(key) & mask;
-
-      int existing;
-      while (!((existing = keys[slot]) == 0)) {
-        if (((existing) == (key))) {
-          return values[slot];
-        }
-        slot = (slot + 1) & mask;
-      }
-
-      return defaultValue;
     }
+
+    final int[] keys = this.keys;
+    final int mask = this.mask;
+    int slot = hashKey(key) & mask;
+
+    int existing;
+    while ((existing = keys[slot]) != 0) {
+      if (existing == key) {
+        return values[slot];
+      }
+      slot = (slot + 1) & mask;
+    }
+
+    return defaultValue;
   }
 
   public boolean containsKey(int key) {
-    if (((key) == 0)) {
+    if (key == 0) {
       return hasEmptyKey;
-    } else {
-      final int[] keys = this.keys;
-      final int mask = this.mask;
-      int slot = hashKey(key) & mask;
+    }
 
-      int existing;
-      while (!((existing = keys[slot]) == 0)) {
-        if (((existing) == (key))) {
-          return true;
-        }
-        slot = (slot + 1) & mask;
-      }
+    final int[] keys = this.keys;
+    final int mask = this.mask;
+    int slot = hashKey(key) & mask;
 
+    // Fast path: check first slot directly
+    int existing = keys[slot];
+    if (existing == key) {
+      return true;
+    }
+    if (existing == 0) {
       return false;
+    }
+
+    // Slow path: linear probing
+    while (true) {
+      slot = (slot + 1) & mask;
+      existing = keys[slot];
+      if (existing == key) {
+        return true;
+      }
+      if (existing == 0) {
+        return false;
+      }
     }
   }
 
   public int indexOf(int key) {
     final int mask = this.mask;
-    if (((key) == 0)) {
+    if (key == 0) {
       return hasEmptyKey ? mask + 1 : ~(mask + 1);
-    } else {
-      final int[] keys = this.keys;
-      int slot = hashKey(key) & mask;
-
-      int existing;
-      while (!((existing = keys[slot]) == 0)) {
-        if (((existing) == (key))) {
-          return slot;
-        }
-        slot = (slot + 1) & mask;
-      }
-
-      return ~slot;
     }
+
+    final int[] keys = this.keys;
+    int slot = hashKey(key) & mask;
+
+    int existing;
+    while ((existing = keys[slot]) != 0) {
+      if (existing == key) {
+        return slot;
+      }
+      slot = (slot + 1) & mask;
+    }
+
+    return ~slot;
   }
 
   public boolean indexExists(int index) {
