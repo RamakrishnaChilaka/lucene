@@ -98,8 +98,18 @@ public class BM25Similarity extends Similarity {
     this(1.2f, 0.75f, true);
   }
 
-  /** Implemented as <code>log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5))</code>. */
+  /**
+   * Implemented as <code>log(1 + (docCount - docFreq + 0.5)/(docFreq + 0.5))</code>.
+   * Uses double precision to avoid floating point precision issues.
+   */
   protected float idf(long docFreq, long docCount) {
+    // Handle edge cases for better numerical stability
+    if (docFreq <= 0) {
+      return (float) Math.log(docCount + 1.0D);
+    }
+    if (docFreq >= docCount) {
+      return 0.0f;
+    }
     return (float) Math.log(1 + (docCount - docFreq + 0.5D) / (docFreq + 0.5D));
   }
 
@@ -152,6 +162,7 @@ public class BM25Similarity extends Similarity {
    * Computes a score factor for a phrase.
    *
    * <p>The default implementation sums the idf factor for each term in the phrase.
+   * Uses Kahan summation for better numerical precision.
    *
    * @param collectionStats collection-level statistics
    * @param termStats term-level statistics for the terms in the phrase
@@ -159,14 +170,20 @@ public class BM25Similarity extends Similarity {
    *     explanation for each term.
    */
   public Explanation idfExplain(CollectionStatistics collectionStats, TermStatistics[] termStats) {
-    double idf = 0d; // sum into a double before casting into a float
+    // Use Kahan summation for better precision
+    double sum = 0.0;
+    double c = 0.0; // compensation for lost low-order bits
     List<Explanation> details = new ArrayList<>();
     for (final TermStatistics stat : termStats) {
       Explanation idfExplain = idfExplain(collectionStats, stat);
       details.add(idfExplain);
-      idf += idfExplain.getValue().floatValue();
+
+      double y = idfExplain.getValue().floatValue() - c;
+      double t = sum + y;
+      c = (t - sum) - y;
+      sum = t;
     }
-    return Explanation.match((float) idf, "idf, sum of:", details);
+    return Explanation.match((float) sum, "idf, sum of:", details);
   }
 
   @Override
@@ -242,11 +259,13 @@ public class BM25Similarity extends Similarity {
       return new BulkSimScorer() {
 
         private float[] normInverses = new float[0];
+        private float[] tempScores = new float[0];
 
         @Override
         public void score(int size, float[] freqs, long[] norms, float[] scores) {
           if (normInverses.length < size) {
             normInverses = new float[ArrayUtil.oversize(size, Float.BYTES)];
+            tempScores = new float[ArrayUtil.oversize(size, Float.BYTES)];
           }
           for (int i = 0; i < size; ++i) {
             normInverses[i] = cache[((byte) norms[i]) & 0xFF];
@@ -254,7 +273,11 @@ public class BM25Similarity extends Similarity {
 
           // This loop auto-vectorizes.
           for (int i = 0; i < size; ++i) {
-            scores[i] = doScore(freqs[i], normInverses[i]);
+            tempScores[i] = freqs[i] * normInverses[i];
+          }
+
+          for (int i = 0; i < size; ++i) {
+            scores[i] = weight - weight / (1f + tempScores[i]);
           }
         }
       };
