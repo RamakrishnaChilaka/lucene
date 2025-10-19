@@ -41,7 +41,9 @@ final class BooleanScorer extends BulkScorer {
 
   // One bucket per doc ID in the window, non-null if scores are needed or if frequencies need to be
   // counted
-  final Bucket[] buckets;
+  //  final Bucket[] buckets;
+  final double[] buckets_scores;
+  final int[] buckets_freq;
   final FixedBitSet matching = new FixedBitSet(SIZE);
 
   final DisiWrapper[] leads;
@@ -63,12 +65,11 @@ final class BooleanScorer extends BulkScorer {
           "This scorer can only be used with two scorers or more, got " + scorers.size());
     }
     if (needsScores || minShouldMatch > 1) {
-      buckets = new Bucket[SIZE];
-      for (int i = 0; i < buckets.length; i++) {
-        buckets[i] = new Bucket();
-      }
+      buckets_scores = new double[SIZE];
+      buckets_freq = new int[SIZE];
     } else {
-      buckets = null;
+      buckets_scores = null;
+      buckets_freq = null;
     }
     this.leads = new DisiWrapper[scorers.size()];
     this.head =
@@ -110,7 +111,7 @@ final class BooleanScorer extends BulkScorer {
       if (w.doc < min) {
         it.advance(min);
       }
-      if (buckets == null) { // means minShouldMatch=1 and scores are not needed
+      if (buckets_scores == null) { // means minShouldMatch=1 and scores are not needed
         // This doesn't apply live docs, so we'll need to apply them later
         it.intoBitSet(max, matching, base);
       } else if (needsScores) {
@@ -122,9 +123,8 @@ final class BooleanScorer extends BulkScorer {
             final float score = docAndScoreBuffer.features[index];
             final int d = doc & MASK;
             matching.set(d);
-            final Bucket bucket = buckets[d];
-            bucket.freq++;
-            bucket.score += score;
+            buckets_freq[d]++;
+            buckets_scores[d] += score;
           }
         }
       } else {
@@ -134,8 +134,7 @@ final class BooleanScorer extends BulkScorer {
           if (acceptDocs == null || acceptDocs.get(doc)) {
             final int d = doc & MASK;
             matching.set(d);
-            final Bucket bucket = buckets[d];
-            bucket.freq++;
+            buckets_freq[d]++;
           }
         }
       }
@@ -143,7 +142,7 @@ final class BooleanScorer extends BulkScorer {
       w.doc = it.docID();
     }
 
-    if (buckets == null) {
+    if (buckets_freq == null) {
       if (acceptDocs != null) {
         // In this case, live docs have not been applied yet.
         acceptDocs.applyMask(matching, base);
@@ -151,20 +150,20 @@ final class BooleanScorer extends BulkScorer {
       collector.collect(new BitSetDocIdStream(matching, base));
     } else {
       FixedBitSet matching = BooleanScorer.this.matching;
-      Bucket[] buckets = BooleanScorer.this.buckets;
       long[] bitArray = matching.getBits();
       for (int idx = 0; idx < bitArray.length; idx++) {
         long bits = bitArray[idx];
         while (bits != 0L) {
           int ntz = Long.numberOfTrailingZeros(bits);
           final int indexInWindow = (idx << 6) | ntz;
-          final Bucket bucket = buckets[indexInWindow];
-          if (bucket.freq >= minShouldMatch) {
-            score.score = (float) bucket.score;
+          final int freq_tmp = buckets_freq[indexInWindow];
+          final double score_tmp = buckets_scores[indexInWindow];
+          if (freq_tmp >= minShouldMatch) {
+            score.score = (float) score_tmp;
             collector.collect(base | indexInWindow);
           }
-          bucket.freq = 0;
-          bucket.score = 0;
+          buckets_freq[indexInWindow] = 0;
+          buckets_scores[indexInWindow] = 0;
           bits ^= 1L << ntz;
         }
       }
