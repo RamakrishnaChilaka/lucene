@@ -19,6 +19,7 @@ package org.apache.lucene.internal.vectorization;
 
 import static org.apache.lucene.util.VectorUtil.EPSILON;
 
+import org.apache.lucene.search.DocAndFloatFeatureBuffer;
 import org.apache.lucene.util.BitUtil;
 import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.SuppressForbidden;
@@ -425,6 +426,23 @@ final class DefaultVectorUtilSupport implements VectorUtilSupport {
       arr[64 + i] = (l >>> 16) & 0xFF;
       arr[128 + i] = (l >>> 8) & 0xFF;
       arr[192 + i] = l & 0xFF;
+    }
+  }
+
+  @Override
+  public void vectorisedProcessBuffer(
+      DocAndFloatFeatureBuffer docAndScoreBuffer,
+      org.apache.lucene.util.FixedBitSet matching,
+      int[] buckets_freq,
+      double[] buckets_scores) {
+    // Fallback scalar implementation
+    for (int index = 0; index < docAndScoreBuffer.size; ++index) {
+      final int doc = docAndScoreBuffer.docs[index];
+      final float score = docAndScoreBuffer.features[index];
+      final int d = doc & org.apache.lucene.search.BooleanScorer.MASK;
+      matching.set(d);
+      buckets_freq[d]++;
+      buckets_scores[d] += score;
     }
   }
 }

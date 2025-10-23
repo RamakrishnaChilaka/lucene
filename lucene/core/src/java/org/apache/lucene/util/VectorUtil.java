@@ -20,6 +20,7 @@ package org.apache.lucene.util;
 import java.util.stream.IntStream;
 import org.apache.lucene.internal.vectorization.VectorUtilSupport;
 import org.apache.lucene.internal.vectorization.VectorizationProvider;
+import org.apache.lucene.search.DocAndFloatFeatureBuffer;
 
 /**
  * Utilities for computations with numeric arrays, especially algebraic operations like vector dot
@@ -500,5 +501,13 @@ public final class VectorUtil {
    */
   public static void expand8(int[] arr) {
     IMPL.expand8(arr);
+  }
+
+  public static void vectorisedProcessBuffer(
+      DocAndFloatFeatureBuffer docAndScoreBuffer,
+      org.apache.lucene.util.FixedBitSet matching,
+      int[] buckets_freq,
+      double[] buckets_scores) {
+    IMPL.vectorisedProcessBuffer(docAndScoreBuffer, matching, buckets_freq, buckets_scores);
   }
 }

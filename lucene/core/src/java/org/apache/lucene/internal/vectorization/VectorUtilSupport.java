@@ -17,6 +17,8 @@
 
 package org.apache.lucene.internal.vectorization;
 
+import org.apache.lucene.search.DocAndFloatFeatureBuffer;
+
 /**
  * Interface for implementations of VectorUtil support.
  *
@@ -152,4 +154,10 @@ public interface VectorUtilSupport {
    * beneficial here because the block size is 256.
    */
   void expand8(int[] arr);
+
+  void vectorisedProcessBuffer(
+      DocAndFloatFeatureBuffer docAndScoreBuffer,
+      org.apache.lucene.util.FixedBitSet matching,
+      int[] buckets_freq,
+      double[] buckets_scores);
 }

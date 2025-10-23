@@ -26,6 +26,7 @@ import static jdk.incubator.vector.VectorOperators.S2I;
 import static jdk.incubator.vector.VectorOperators.ZERO_EXTEND_B2I;
 import static jdk.incubator.vector.VectorOperators.ZERO_EXTEND_B2S;
 import static jdk.incubator.vector.VectorOperators.ZERO_EXTEND_S2I;
+import static org.apache.lucene.search.BooleanScorer.MASK;
 import static org.apache.lucene.util.VectorUtil.EPSILON;
 
 import java.lang.foreign.MemorySegment;
@@ -40,6 +41,7 @@ import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorSpecies;
+import org.apache.lucene.search.DocAndFloatFeatureBuffer;
 import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.SuppressForbidden;
 
@@ -1432,6 +1434,53 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         arr[128 + i] = (l >>> 8) & 0xFF;
         arr[192 + i] = l & 0xFF;
       }
+    }
+  }
+
+  @Override
+  public void vectorisedProcessBuffer(
+      DocAndFloatFeatureBuffer docAndScoreBuffer,
+      org.apache.lucene.util.FixedBitSet matching,
+      int[] buckets_freq,
+      double[] buckets_scores) {
+    final int[] docs = docAndScoreBuffer.docs;
+    final float[] scores = docAndScoreBuffer.features;
+    final int size = docAndScoreBuffer.size;
+
+    int[] maskedDocsArray = new int[size];
+    int maskedDocsCount = 0;
+
+    int i = 0;
+    final int vectorLength = INT_SPECIES.length();
+
+    // Process in vector chunks
+    for (; i <= size - vectorLength; i += vectorLength) {
+      IntVector docVec = IntVector.fromArray(INT_SPECIES, docs, i);
+      FloatVector scoreVec = FloatVector.fromArray(FLOAT_SPECIES, scores, i);
+      IntVector maskedDocs = docVec.and(MASK);
+
+      maskedDocs.intoArray(maskedDocsArray, maskedDocsCount);
+      for (int j = 0; j < vectorLength; j++) {
+        final int d = maskedDocsArray[maskedDocsCount + j];
+        buckets_freq[d]++;
+        buckets_scores[d] += scoreVec.lane(j);
+      }
+      maskedDocsCount += vectorLength;
+    }
+
+    // Process remaining elements
+    for (; i < size; i++) {
+      final int doc = docs[i];
+      final float score = scores[i];
+      final int d = doc & MASK;
+      maskedDocsArray[maskedDocsCount++] = d;
+      buckets_freq[d]++;
+      buckets_scores[d] += score;
+    }
+
+    // Batch set all matching bits
+    for (int j = 0; j < maskedDocsCount; j++) {
+      matching.set(maskedDocsArray[j]);
     }
   }
 }

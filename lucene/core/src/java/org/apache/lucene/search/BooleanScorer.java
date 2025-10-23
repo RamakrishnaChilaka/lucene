@@ -22,17 +22,18 @@ import org.apache.lucene.internal.hppc.LongArrayList;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.PriorityQueue;
+import org.apache.lucene.util.VectorUtil;
 
 /**
  * {@link BulkScorer} that is used for pure disjunctions and disjunctions that have low values of
  * {@link BooleanQuery.Builder#setMinimumNumberShouldMatch(int)} and dense clauses. This scorer
  * scores documents by batches of 4,096 docs.
  */
-final class BooleanScorer extends BulkScorer {
+public final class BooleanScorer extends BulkScorer {
 
   static final int SHIFT = 12;
   static final int SIZE = 1 << SHIFT;
-  static final int MASK = SIZE - 1;
+  public static final int MASK = SIZE - 1;
 
   static class Bucket {
     double score;
@@ -94,6 +95,10 @@ final class BooleanScorer extends BulkScorer {
     return cost;
   }
 
+  private void processBufferVectorized() {
+    VectorUtil.vectorisedProcessBuffer(docAndScoreBuffer, matching, buckets_freq, buckets_scores);
+  }
+
   private void scoreWindowIntoBitSetAndReplay(
       LeafCollector collector,
       Bits acceptDocs,
@@ -118,14 +123,7 @@ final class BooleanScorer extends BulkScorer {
         for (w.scorer.nextDocsAndScores(max, acceptDocs, docAndScoreBuffer);
             docAndScoreBuffer.size > 0;
             w.scorer.nextDocsAndScores(max, acceptDocs, docAndScoreBuffer)) {
-          for (int index = 0; index < docAndScoreBuffer.size; ++index) {
-            final int doc = docAndScoreBuffer.docs[index];
-            final float score = docAndScoreBuffer.features[index];
-            final int d = doc & MASK;
-            matching.set(d);
-            buckets_freq[d]++;
-            buckets_scores[d] += score;
-          }
+          processBufferVectorized();
         }
       } else {
         // Scores are not needed but we need to keep track of freqs to know which hits match
