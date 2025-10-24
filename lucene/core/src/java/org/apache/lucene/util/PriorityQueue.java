@@ -334,20 +334,20 @@ public class PriorityQueue<T> implements Iterable<T> {
   }
 
   private void downHeap(int i) {
-    T node = heap[i]; // save top node
-    int j = i << 1; // find smaller child
-    int k = j + 1;
-    if (k <= size && lessThan.lessThan(heap[k], heap[j])) {
-      j = k;
-    }
-    while (j <= size && lessThan.lessThan(heap[j], node)) {
-      heap[i] = heap[j]; // shift up child
-      i = j;
-      j = i << 1;
-      k = j + 1;
-      if (k <= size && lessThan.lessThan(heap[k], heap[j])) {
-        j = k;
+    final int end = size;  // Cache size for minor read optimization
+    T node = heap[i];
+    int child = i << 1;    // Potential left child index
+    while (child <= end) {
+      int right = child + 1;
+      if (right <= end && lessThan.lessThan(heap[right], heap[child])) {
+        child = right;   // Select smaller child
       }
+      if (!lessThan.lessThan(heap[child], node)) {
+        break;           // No violation; stop
+      }
+      heap[i] = heap[child];  // Shift child up
+      i = child;
+      child = i << 1;          // Next potential left child
     }
     heap[i] = node; // install saved node
   }
