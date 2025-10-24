@@ -1437,7 +1437,7 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
     }
   }
 
-  public static final int vectorLength = INT_SPECIES.length();
+  private static final int vectorLength = INT_SPECIES.length();
 
   @Override
   public void vectorisedProcessBuffer(
@@ -1450,24 +1450,20 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
     final int size = docAndScoreBuffer.size;
 
     int i = 0;
-    int[] tempDocs = new int[vectorLength];
-    float[] tempScores = new float[vectorLength];
-    // Process in vector chunks with proper vectorization
-    for (; i <= size - vectorLength; i += vectorLength) {
-      IntVector docVec = IntVector.fromArray(INT_SPECIES, docs, i);
-      FloatVector scoreVec = FloatVector.fromArray(FLOAT_SPECIES, scores, i);
-      IntVector maskedDocs = docVec.and(MASK);
+    if (size > 2 * vectorLength) {
+      // Process in vector chunks, loading directly into temporary buffers
+      for (; i <= size - vectorLength; i += vectorLength) {
+        IntVector docVec = IntVector.fromArray(INT_SPECIES, docs, i);
+        FloatVector scoreVec = FloatVector.fromArray(FLOAT_SPECIES, scores, i);
+        IntVector maskedDocs = docVec.and(MASK);
 
-      // Extract masked docs and scores to arrays for processing
-      maskedDocs.intoArray(tempDocs, 0);
-      scoreVec.intoArray(tempScores, 0);
-
-      // Process all elements in this vector chunk
-      for (int j = 0; j < vectorLength; j++) {
-        final int d = tempDocs[j];
-        buckets_freq[d]++;
-        buckets_scores[d] += tempScores[j];
-        matching.set(d);
+        // Process vector lanes individually without intermediate array copies
+        for (int j = 0; j < vectorLength; j++) {
+          final int d = maskedDocs.lane(j);
+          buckets_freq[d]++;
+          buckets_scores[d] += scoreVec.lane(j);
+          matching.set(d);
+        }
       }
     }
 
