@@ -1437,6 +1437,8 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
     }
   }
 
+  public static final int vectorLength = INT_SPECIES.length();
+
   @Override
   public void vectorisedProcessBuffer(
       DocAndFloatFeatureBuffer docAndScoreBuffer,
@@ -1447,25 +1449,26 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
     final float[] scores = docAndScoreBuffer.features;
     final int size = docAndScoreBuffer.size;
 
-    int[] maskedDocsArray = new int[size];
-    int maskedDocsCount = 0;
-
     int i = 0;
-    final int vectorLength = INT_SPECIES.length();
-
-    // Process in vector chunks
+    int[] tempDocs = new int[vectorLength];
+    float[] tempScores = new float[vectorLength];
+    // Process in vector chunks with proper vectorization
     for (; i <= size - vectorLength; i += vectorLength) {
       IntVector docVec = IntVector.fromArray(INT_SPECIES, docs, i);
       FloatVector scoreVec = FloatVector.fromArray(FLOAT_SPECIES, scores, i);
       IntVector maskedDocs = docVec.and(MASK);
 
-      maskedDocs.intoArray(maskedDocsArray, maskedDocsCount);
+      // Extract masked docs and scores to arrays for processing
+      maskedDocs.intoArray(tempDocs, 0);
+      scoreVec.intoArray(tempScores, 0);
+
+      // Process all elements in this vector chunk
       for (int j = 0; j < vectorLength; j++) {
-        final int d = maskedDocsArray[maskedDocsCount + j];
+        final int d = tempDocs[j];
         buckets_freq[d]++;
-        buckets_scores[d] += scoreVec.lane(j);
+        buckets_scores[d] += tempScores[j];
+        matching.set(d);
       }
-      maskedDocsCount += vectorLength;
     }
 
     // Process remaining elements
@@ -1473,14 +1476,9 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
       final int doc = docs[i];
       final float score = scores[i];
       final int d = doc & MASK;
-      maskedDocsArray[maskedDocsCount++] = d;
       buckets_freq[d]++;
       buckets_scores[d] += score;
-    }
-
-    // Batch set all matching bits
-    for (int j = 0; j < maskedDocsCount; j++) {
-      matching.set(maskedDocsArray[j]);
+      matching.set(d);
     }
   }
 }
