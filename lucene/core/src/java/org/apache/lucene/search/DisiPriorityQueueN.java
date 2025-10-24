@@ -202,25 +202,31 @@ final class DisiPriorityQueueN extends DisiPriorityQueue {
   void downHeap(int size) {
     int i = 0;
     final DisiWrapper node = heap[0];
-    int j = leftNode(i);
-    if (j < size) {
-      int k = rightNode(j);
-      if (k < size && heap[k].doc < heap[j].doc) {
-        j = k;
+    final int nodeDoc = node.doc;
+
+    while (true) {
+      int left = (i << 1) + 1;
+      if (left >= size) break;
+
+      int right = left + 1;
+      int child = left;
+      int childDoc = heap[left].doc;
+
+      // Pick the smaller child
+      if (right < size && heap[right].doc < childDoc) {
+        child = right;
+        childDoc = heap[right].doc;
       }
-      if (heap[j].doc < node.doc) {
-        do {
-          heap[i] = heap[j];
-          i = j;
-          j = leftNode(i);
-          k = rightNode(j);
-          if (k < size && heap[k].doc < heap[j].doc) {
-            j = k;
-          }
-        } while (j < size && heap[j].doc < node.doc);
-        heap[i] = node;
-      }
+
+      // Stop if node is smaller than both children
+      if (nodeDoc <= childDoc) break;
+
+      // Swap parent with smaller child
+      heap[i] = heap[child];
+      i = child;
     }
+
+    heap[i] = node;
   }
 
   @Override
