@@ -48,16 +48,15 @@ import org.apache.lucene.store.DataOutput;
 import org.apache.lucene.util.VectorUtil;
 
 /**
- * Inspired from https://fulmicoton.com/posts/bitpacking/
- * Encodes multiple integers in one to get SIMD-like speedups.
- * If bitsPerValue &lt;= 8 then we pack 4 ints per Java int
- * else if bitsPerValue &lt;= 16 we pack 2 ints per Java int
- * else we do scalar operations.
+ * Inspired from https://fulmicoton.com/posts/bitpacking/ Encodes multiple integers in one to get
+ * SIMD-like speedups. If bitsPerValue &lt;= 8 then we pack 4 ints per Java int else if bitsPerValue
+ * &lt;= 16 we pack 2 ints per Java int else we do scalar operations.
  */
 public final class ForUtil {
 
   /** Number of integers per block. */
   public static final int BLOCK_SIZE = 256;
+
   static final int BLOCK_SIZE_LOG2 = 8;
 
   static int expandMask16(int mask16) {
@@ -86,11 +85,7 @@ public final class ForUtil {
 
   static void collapse8(int[] arr) {
     for (int i = 0; i < 64; ++i) {
-      arr[i] =
-          (arr[i] << 24)
-              | (arr[64 + i] << 16)
-              | (arr[128 + i] << 8)
-              | arr[192 + i];
+      arr[i] = (arr[i] << 24) | (arr[64 + i] << 16) | (arr[128 + i] << 8) | arr[192 + i];
     }
   }
 
@@ -125,7 +120,8 @@ public final class ForUtil {
     encode(ints, bitsPerValue, nextPrimitive, out, tmp);
   }
 
-  static void encode(int[] ints, int bitsPerValue, int primitiveSize, DataOutput out, int[] tmp) throws IOException {
+  static void encode(int[] ints, int bitsPerValue, int primitiveSize, DataOutput out, int[] tmp)
+      throws IOException {
     final int numInts = BLOCK_SIZE * primitiveSize / Integer.SIZE;
 
     final int numIntsPerShift = bitsPerValue * 8;
@@ -282,6 +278,7 @@ if __name__ == '__main__':
     f.write('      MASKS%d[i] = mask%d(i);\n' %(primitive_size, primitive_size))
     f.write('    }\n')
   f.write('  }')
+  f.write('\n')
   f.write("""
   // mark values in array as final ints to avoid the cost of reading array, arrays should only be
   // used when the idx is a variable
@@ -314,6 +311,7 @@ if __name__ == '__main__':
   f.write('        break;\n')
   f.write('    }\n')
   f.write('  }\n')
+  f.write('\n')
 
   for i in range(1, MAX_SPECIALIZED_BITS_PER_VALUE+1):
     writeDecode(i, f)
