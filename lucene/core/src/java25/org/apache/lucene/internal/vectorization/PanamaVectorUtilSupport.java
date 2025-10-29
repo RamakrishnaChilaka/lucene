@@ -21,6 +21,7 @@ import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static jdk.incubator.vector.VectorOperators.ADD;
 import static jdk.incubator.vector.VectorOperators.B2I;
 import static jdk.incubator.vector.VectorOperators.B2S;
+import static jdk.incubator.vector.VectorOperators.LSHL;
 import static jdk.incubator.vector.VectorOperators.LSHR;
 import static jdk.incubator.vector.VectorOperators.S2I;
 import static jdk.incubator.vector.VectorOperators.ZERO_EXTEND_B2I;
@@ -1433,5 +1434,55 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         arr[192 + i] = l & 0xFF;
       }
     }
+  }
+
+  @Override
+  public void collapse8(int[] arr) {
+    for (int i = 0; i < 64; i += INT_SPECIES.length()) {
+      IntVector b0 = IntVector.fromArray(INT_SPECIES, arr, i); // 0..7
+      IntVector b1 = IntVector.fromArray(INT_SPECIES, arr, 64 + i); // 64..71
+      IntVector b2 = IntVector.fromArray(INT_SPECIES, arr, 128 + i); // 128..135
+      IntVector b3 = IntVector.fromArray(INT_SPECIES, arr, 192 + i); // 192..199
+
+      IntVector res =
+          b0.lanewise(LSHL, 24).or(b1.lanewise(LSHL, 16)).or(b2.lanewise(LSHL, 8)).or(b3);
+      res.intoArray(arr, i);
+    }
+  }
+
+  @Override
+  public int compressIntegers(int primitiveSize, int bpv, int numIntsPerShift, int[] dst, int[] src){
+    int srcIdx = 0;
+    int shift = primitiveSize - bpv;
+
+    // Vectorized first loop
+    int vectorLimit = INT_SPECIES.loopBound(numIntsPerShift);
+    for (int i = 0; i < vectorLimit; i += INT_SPECIES.length()) {
+      IntVector srcVec = IntVector.fromArray(INT_SPECIES, src, srcIdx + i);
+      IntVector shiftedVec = srcVec.lanewise(LSHL, shift);
+      shiftedVec.intoArray(dst, i);
+    }
+    // Scalar tail for first loop
+    for (int i = vectorLimit; i < numIntsPerShift; ++i) {
+      dst[i] = src[srcIdx++] << shift;
+    }
+    srcIdx += vectorLimit;
+
+    // Vectorized remaining loops
+    for (shift = shift - bpv; shift >= 0; shift -= bpv) {
+      for (int i = 0; i < vectorLimit; i += INT_SPECIES.length()) {
+        IntVector srcVec = IntVector.fromArray(INT_SPECIES, src, srcIdx + i);
+        IntVector shiftedVec = srcVec.lanewise(LSHL, shift);
+        IntVector dstVec = IntVector.fromArray(INT_SPECIES, dst, i);
+        IntVector result = dstVec.lanewise(VectorOperators.OR, shiftedVec);
+        result.intoArray(dst, i);
+      }
+      // Scalar tail
+      for (int i = vectorLimit; i < numIntsPerShift; ++i) {
+        dst[i] |= src[srcIdx++] << shift;
+      }
+      srcIdx += vectorLimit;
+    }
+    return srcIdx;
   }
 }

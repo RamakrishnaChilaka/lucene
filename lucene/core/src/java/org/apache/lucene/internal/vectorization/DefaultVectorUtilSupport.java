@@ -19,6 +19,7 @@ package org.apache.lucene.internal.vectorization;
 
 import static org.apache.lucene.util.VectorUtil.EPSILON;
 
+import org.apache.lucene.codecs.lucene104.ForUtil;
 import org.apache.lucene.util.BitUtil;
 import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.SuppressForbidden;
@@ -426,5 +427,17 @@ final class DefaultVectorUtilSupport implements VectorUtilSupport {
       arr[128 + i] = (l >>> 8) & 0xFF;
       arr[192 + i] = l & 0xFF;
     }
+  }
+
+  @Override
+  public void collapse8(int[] arr) {
+    for (int i = 0; i < 64; ++i) {
+      arr[i] = (arr[i] << 24) | (arr[64 + i] << 16) | (arr[128 + i] << 8) | arr[192 + i];
+    }
+  }
+
+  public int compressIntegers(
+      int primitiveSize, int bpv, int numIntsPerShift, int[] dst, int[] src) {
+    return ForUtil.compressIntegers(primitiveSize, bpv, numIntsPerShift, dst, src);
   }
 }

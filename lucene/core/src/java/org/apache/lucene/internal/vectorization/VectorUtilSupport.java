@@ -152,4 +152,8 @@ public interface VectorUtilSupport {
    * beneficial here because the block size is 256.
    */
   void expand8(int[] arr);
+
+  void collapse8(int[] arr);
+
+  int compressIntegers(int primitiveSize, int bpv, int numIntsPerShift, int[] dst, int[] src);
 }

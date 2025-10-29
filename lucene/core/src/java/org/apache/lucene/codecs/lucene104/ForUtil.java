@@ -60,9 +60,7 @@ public final class ForUtil {
   }
 
   static void collapse8(int[] arr) {
-    for (int i = 0; i < 64; ++i) {
-      arr[i] = (arr[i] << 24) | (arr[64 + i] << 16) | (arr[128 + i] << 8) | arr[192 + i];
-    }
+    VectorUtil.collapse8(arr);
   }
 
   static void expand16(int[] arr) {
@@ -82,7 +80,7 @@ public final class ForUtil {
   private final int[] tmp = new int[BLOCK_SIZE];
 
   /** Encode 256 integers from {@code ints} into {@code out}. */
-  void encode(int[] ints, int bitsPerValue, DataOutput out) throws IOException {
+  public void encode(int[] ints, int bitsPerValue, DataOutput out) throws IOException {
     final int nextPrimitive;
     if (bitsPerValue <= 8) {
       nextPrimitive = 8;
@@ -101,18 +99,15 @@ public final class ForUtil {
     final int numInts = BLOCK_SIZE * primitiveSize / Integer.SIZE;
 
     final int numIntsPerShift = bitsPerValue * 8;
-    int idx = 0;
     int shift = primitiveSize - bitsPerValue;
-    for (int i = 0; i < numIntsPerShift; ++i) {
-      tmp[i] = ints[idx++] << shift;
+    int idx;
+    if (bitsPerValue < 8) {
+      // use vectorised impl for bpv <= 8
+      idx = VectorUtil.compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
+    } else {
+      idx = compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
     }
-    for (shift = shift - bitsPerValue; shift >= 0; shift -= bitsPerValue) {
-      for (int i = 0; i < numIntsPerShift; ++i) {
-        tmp[i] |= ints[idx++] << shift;
-      }
-    }
-
-    final int remainingBitsPerInt = shift + bitsPerValue;
+    final int remainingBitsPerInt = shift % bitsPerValue;
     final int maskRemainingBitsPerInt;
     if (primitiveSize == 8) {
       maskRemainingBitsPerInt = MASKS8[remainingBitsPerInt];
@@ -153,6 +148,23 @@ public final class ForUtil {
     for (int i = 0; i < numIntsPerShift; ++i) {
       out.writeInt(tmp[i]);
     }
+  }
+
+  public static int compressIntegers(
+      int primitiveSize, int bpv, int numIntsPerShift, int[] dst, int[] src) {
+    int srcIdx = 0;
+    int shift = primitiveSize - bpv;
+
+    for (int i = 0; i < numIntsPerShift; ++i) {
+      dst[i] = src[srcIdx++] << shift;
+    }
+
+    for (shift = shift - bpv; shift >= 0; shift -= bpv) {
+      for (int i = 0; i < numIntsPerShift; ++i) {
+        dst[i] |= src[srcIdx++] << shift;
+      }
+    }
+    return srcIdx;
   }
 
   /** Number of bytes required to encode 256 integers of {@code bitsPerValue} bits per value. */
