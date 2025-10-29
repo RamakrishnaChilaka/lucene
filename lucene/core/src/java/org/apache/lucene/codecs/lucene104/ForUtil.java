@@ -101,7 +101,7 @@ public final class ForUtil {
     final int numIntsPerShift = bitsPerValue * 8;
     int shift = primitiveSize - bitsPerValue;
     int idx;
-    if (bitsPerValue < 8) {
+    if (bitsPerValue <= 4) {
       // use vectorised impl for bpv <= 8
       idx = VectorUtil.compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
     } else {
