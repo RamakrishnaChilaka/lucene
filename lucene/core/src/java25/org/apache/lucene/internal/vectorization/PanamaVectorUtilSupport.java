@@ -1438,7 +1438,8 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
 
   @Override
   public void collapse8(int[] arr) {
-    for (int i = 0; i < 64; i += INT_SPECIES.length()) {
+    final int vLen = INT_SPECIES.length();
+    for (int i = 0; i < 64; i += vLen) {
       IntVector b0 = IntVector.fromArray(INT_SPECIES, arr, i); // 0..7
       IntVector b1 = IntVector.fromArray(INT_SPECIES, arr, 64 + i); // 64..71
       IntVector b2 = IntVector.fromArray(INT_SPECIES, arr, 128 + i); // 128..135

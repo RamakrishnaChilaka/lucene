@@ -101,12 +101,13 @@ public final class ForUtil {
     final int numIntsPerShift = bitsPerValue * 8;
     int shift = primitiveSize - bitsPerValue;
     int idx;
-    if (bitsPerValue <= 4) {
-      // use vectorised impl for bpv <= 8
-      idx = VectorUtil.compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
-    } else {
-      idx = compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
-    }
+    idx = compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
+//    if (bitsPerValue <= 8) {
+//      // use vectorised impl for bpv <= 8
+//      idx = VectorUtil.compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
+//    } else {
+//      idx = compressIntegers(primitiveSize, bitsPerValue, numIntsPerShift, tmp, ints);
+//    }
     final int remainingBitsPerInt = shift % bitsPerValue;
     final int maskRemainingBitsPerInt;
     if (primitiveSize == 8) {

@@ -42,7 +42,7 @@ import org.openjdk.jmh.infra.Blackhole;
 @State(Scope.Benchmark)
 @Warmup(iterations = 3, time = 3)
 @Measurement(iterations = 5, time = 5)
-@Fork(value = 1)
+@Fork(value = 2)
 public class ForUtilEncodeBenchmark {
 
   private final ForUtil forUtil = new ForUtil();
