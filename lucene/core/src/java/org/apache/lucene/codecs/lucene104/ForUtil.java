@@ -155,7 +155,6 @@ public final class ForUtil {
       }
     }
 
-    System.out.println("class is " + out.getClass());
     if (out instanceof OutputStreamIndexOutput o) {
       o.writeInts(tmp, 0, numIntsPerShift);
     } else {
