@@ -96,11 +96,11 @@ public abstract class DataOutput {
    * @param length the number of ints to write
    * @see DataInput#readInts(int[], int, int)
    */
-  public void writeInts(int[] src, int offset, int length) throws IOException {
-    for (int i = 0; i < length; ++i) {
-      writeInt(src[offset + i]);
-    }
-  }
+//  public void writeInts(int[] src, int offset, int length) throws IOException {
+//    for (int i = 0; i < length; ++i) {
+//      writeInt(src[offset + i]);
+//    }
+//  }
 
   /**
    * Writes an int in a variable-length format. Writes between one and five bytes. Smaller values
