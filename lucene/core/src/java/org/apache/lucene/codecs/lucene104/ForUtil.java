@@ -21,6 +21,7 @@ package org.apache.lucene.codecs.lucene104;
 import java.io.IOException;
 import org.apache.lucene.internal.vectorization.PostingDecodingUtil;
 import org.apache.lucene.store.DataOutput;
+import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.apache.lucene.util.VectorUtil;
 
 /**
@@ -82,7 +83,7 @@ public final class ForUtil {
   private final int[] tmp = new int[BLOCK_SIZE];
 
   /** Encode 256 integers from {@code ints} into {@code out}. */
-  void encode(int[] ints, int bitsPerValue, DataOutput out) throws IOException {
+  public void encode(int[] ints, int bitsPerValue, DataOutput out) throws IOException {
     final int nextPrimitive;
     if (bitsPerValue <= 8) {
       nextPrimitive = 8;
@@ -101,6 +102,10 @@ public final class ForUtil {
     final int numInts = BLOCK_SIZE * primitiveSize / Integer.SIZE;
 
     final int numIntsPerShift = bitsPerValue * 8;
+
+    // Precompute masks to avoid array lookups
+    final int[] masks = (primitiveSize == 8) ? MASKS8 : (primitiveSize == 16) ? MASKS16 : MASKS32;
+
     int idx = 0;
     int shift = primitiveSize - bitsPerValue;
     for (int i = 0; i < numIntsPerShift; ++i) {
@@ -150,7 +155,13 @@ public final class ForUtil {
       }
     }
 
-    out.writeInts(tmp, 0, numIntsPerShift);
+    if (out instanceof OutputStreamIndexOutput o) {
+      o.writeInts(tmp, 0, numIntsPerShift);
+    } else {
+      for (int i = 0; i < numIntsPerShift; i++) {
+        out.writeInt(ints[i]);
+      }
+    }
   }
 
   /** Number of bytes required to encode 256 integers of {@code bitsPerValue} bits per value. */
