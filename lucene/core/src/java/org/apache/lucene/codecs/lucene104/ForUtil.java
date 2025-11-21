@@ -155,7 +155,13 @@ public final class ForUtil {
       }
     }
 
-    out.writeInts(tmp, 0, numIntsPerShift);
+    if (out instanceof OutputStreamIndexOutput fsIndexOutput) {
+      fsIndexOutput.writeInts(tmp, 0, numIntsPerShift);
+    } else {
+      for (int i = 0;i < numIntsPerShift;++i) {
+        out.writeInt(tmp[i]);
+      }
+    }
   }
 
   /** Number of bytes required to encode 256 integers of {@code bitsPerValue} bits per value. */

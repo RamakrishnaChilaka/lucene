@@ -72,7 +72,6 @@ public class OutputStreamIndexOutput extends IndexOutput {
     bytesWritten += Integer.BYTES;
   }
 
-  @Override
   public void writeInts(int[] src, int offset, int length) throws IOException {
     os.writeInts(src, offset, length);
     bytesWritten += (long) length * Integer.BYTES;
