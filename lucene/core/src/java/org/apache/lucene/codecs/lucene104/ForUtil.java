@@ -21,6 +21,7 @@ package org.apache.lucene.codecs.lucene104;
 import java.io.IOException;
 import org.apache.lucene.internal.vectorization.PostingDecodingUtil;
 import org.apache.lucene.store.DataOutput;
+import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.apache.lucene.util.VectorUtil;
 
 /**
@@ -150,8 +151,12 @@ public final class ForUtil {
       }
     }
 
-    for (int i = 0; i < numIntsPerShift; ++i) {
-      out.writeInt(tmp[i]);
+    if (out instanceof OutputStreamIndexOutput o) {
+      o.writeInts(tmp, 0, numIntsPerShift);
+    } else {
+      for (int i = 0; i < numIntsPerShift; ++i) {
+        out.writeInt(tmp[i]);
+      }
     }
   }
 
