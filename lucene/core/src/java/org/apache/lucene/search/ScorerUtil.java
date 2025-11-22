@@ -150,7 +150,8 @@ class ScorerUtil {
       double maxRemainingScore,
       float minCompetitiveScore,
       int numScorers) {
-    double minRequiredScore = minRequiredScore(maxRemainingScore, minCompetitiveScore, numScorers);
+    float minRequiredScore =
+        (float) minRequiredScore(maxRemainingScore, minCompetitiveScore, numScorers);
 
     if (minRequiredScore <= 0) {
       return;

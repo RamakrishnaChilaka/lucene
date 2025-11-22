@@ -484,7 +484,7 @@ public final class VectorUtil {
    * @return how many pairs left after filter
    */
   public static int filterByScore(
-      int[] docBuffer, double[] scoreBuffer, double minScoreInclusive, int upTo) {
+      int[] docBuffer, float[] scoreBuffer, float minScoreInclusive, int upTo) {
     if (docBuffer.length != scoreBuffer.length || docBuffer.length < upTo) {
       throw new IllegalArgumentException(
           "docBuffer and scoreBuffer should keep same length and at least as long as upTo");

@@ -26,13 +26,13 @@ import org.apache.lucene.util.IntsRef;
  */
 public final class DocAndScoreAccBuffer {
 
-  private static final double[] EMPTY_DOUBLES = new double[0];
+  private static final float[] EMPTY_DOUBLES = new float[0];
 
   /** Doc IDs */
   public int[] docs = IntsRef.EMPTY_INTS;
 
   /** Scores */
-  public double[] scores = EMPTY_DOUBLES;
+  public float[] scores = EMPTY_DOUBLES;
 
   /** Number of valid entries in the doc ID and score arrays. */
   public int size;
@@ -47,7 +47,7 @@ public final class DocAndScoreAccBuffer {
   public void growNoCopy(int minSize) {
     if (docs.length < minSize) {
       docs = ArrayUtil.growNoCopy(docs, minSize);
-      scores = new double[docs.length];
+      scores = new float[docs.length];
     }
   }
 

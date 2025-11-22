@@ -141,7 +141,7 @@ public interface VectorUtilSupport {
    * @param upTo where the filter should end
    * @return how many pairs left after filter
    */
-  int filterByScore(int[] docBuffer, double[] scoreBuffer, double minScoreInclusive, int upTo);
+  int filterByScore(int[] docBuffer, float[] scoreBuffer, float minScoreInclusive, int upTo);
 
   float[] l2normalize(float[] v, boolean throwOnZero);
 

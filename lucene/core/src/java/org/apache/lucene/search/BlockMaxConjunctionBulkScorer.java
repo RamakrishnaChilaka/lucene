@@ -191,7 +191,7 @@ final class BlockMaxConjunctionBulkScorer extends BulkScorer {
       }
 
       for (int i = 0; i < docAndScoreAccBuffer.size; ++i) {
-        scorable.score = (float) docAndScoreAccBuffer.scores[i];
+        scorable.score = docAndScoreAccBuffer.scores[i];
         collector.collect(docAndScoreAccBuffer.docs[i]);
       }
     }

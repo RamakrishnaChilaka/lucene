@@ -48,7 +48,7 @@ final class MaxScoreBulkScorer extends BulkScorer {
   private final DisiWrapper filter;
 
   private final FixedBitSet windowMatches = new FixedBitSet(INNER_WINDOW_SIZE);
-  private final double[] windowScores = new double[INNER_WINDOW_SIZE];
+  private final float[] windowScores = new float[INNER_WINDOW_SIZE];
 
   private final DocAndFloatFeatureBuffer docAndScoreBuffer = new DocAndFloatFeatureBuffer();
   private final DocAndScoreAccBuffer docAndScoreAccBuffer = new DocAndScoreAccBuffer();
@@ -198,7 +198,7 @@ final class MaxScoreBulkScorer extends BulkScorer {
         boolean match =
             (acceptDocs == null || acceptDocs.get(doc))
                 && (filter.twoPhaseView == null || filter.twoPhaseView.matches());
-        double score = 0;
+        float score = 0;
         do {
           if (match) {
             score += top.scorer.score();
@@ -273,7 +273,7 @@ final class MaxScoreBulkScorer extends BulkScorer {
           docAndScoreAccBuffer.docs[docAndScoreAccBuffer.size] = innerWindowMin + index;
           docAndScoreAccBuffer.scores[docAndScoreAccBuffer.size] = windowScores[index];
           docAndScoreAccBuffer.size++;
-          windowScores[index] = 0d;
+          windowScores[index] = 0f;
         });
     windowMatches.clear(0, innerWindowSize);
 
@@ -351,7 +351,7 @@ final class MaxScoreBulkScorer extends BulkScorer {
     }
 
     for (int i = 0; i < buffer.size; ++i) {
-      scorable.score = (float) buffer.scores[i];
+      scorable.score = buffer.scores[i];
       collector.collect(buffer.docs[i]);
     }
   }
