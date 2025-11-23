@@ -155,12 +155,8 @@ public final class ForUtil {
       }
     }
 
-    if (out instanceof OutputStreamIndexOutput fsIndexOutput) {
-      fsIndexOutput.writeInts(tmp, 0, numIntsPerShift);
-    } else {
-      for (int i = 0;i < numIntsPerShift;++i) {
-        out.writeInt(tmp[i]);
-      }
+    for (int i = 0;i < numIntsPerShift;++i) {
+      out.writeInt(tmp[i]);
     }
   }
 

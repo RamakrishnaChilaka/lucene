@@ -210,10 +210,27 @@ public abstract class DataOutput {
    * @see DataInput#readVInt()
    */
   public final void writeVInt(int i) throws IOException {
-    while ((i & ~0x7F) != 0) {
+    // Fast path for common single-byte values (0-127)
+    if ((i & ~0x7F) == 0) {
+      writeByte((byte) i);
+      return;
+    }
+    
+    // Unroll first iteration to avoid loop overhead for 2-byte values
+    writeByte((byte) ((i & 0x7F) | 0x80));
+    i >>>= 7;
+    
+    if ((i & ~0x7F) == 0) {
+      writeByte((byte) i);
+      return;
+    }
+    
+    // Handle remaining bytes with loop
+    do {
       writeByte((byte) ((i & 0x7F) | 0x80));
       i >>>= 7;
-    }
+    } while ((i & ~0x7F) != 0);
+    
     writeByte((byte) i);
   }
 
