@@ -209,7 +209,7 @@ public abstract class DataOutput {
    * @throws IOException If there is an I/O error writing to the underlying medium.
    * @see DataInput#readVInt()
    */
-  public final void writeVIntTmp(int i) throws IOException {
+  public final void writeVInt(int i) throws IOException {
     // Fast path for common single-byte values (0-127)
     if ((i & ~0x7F) == 0) {
       writeByte((byte) i);
@@ -234,7 +234,7 @@ public abstract class DataOutput {
     writeByte((byte) i);
   }
 
-  public void writeVInt(long value) throws IOException {
+  public void writeVIntTmp(long value) throws IOException {
     if (value < 251) {
       writeByte((byte) value);
     } else if (value < 0x10000) {
