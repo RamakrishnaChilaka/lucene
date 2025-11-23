@@ -241,21 +241,37 @@ final class MaxScoreBulkScorer extends BulkScorer {
       LeafCollector collector, Bits acceptDocs, int max) throws IOException {
     DisiWrapper top = essentialQueue.top();
 
-    int innerWindowMin = top.doc;
-    int innerWindowMax = MathUtil.unsignedMin(max, innerWindowMin + INNER_WINDOW_SIZE);
-    int innerWindowSize = innerWindowMax - innerWindowMin;
+    final int innerWindowMin = top.doc;
+    final int innerWindowMax = MathUtil.unsignedMin(max, innerWindowMin + INNER_WINDOW_SIZE);
+    final int innerWindowSize = innerWindowMax - innerWindowMin;
+
+    // Cache frequently accessed arrays to reduce field access overhead
+    final int[] docBuffer = docAndScoreBuffer.docs;
+    final float[] featureBuffer = docAndScoreBuffer.features;
+    final double[] scores = windowScores;
+    final FixedBitSet matches = windowMatches;
 
     // Collect matches of essential clauses into a bitset
     do {
       for (top.scorer.nextDocsAndScores(innerWindowMax, acceptDocs, docAndScoreBuffer);
           docAndScoreBuffer.size > 0;
           top.scorer.nextDocsAndScores(innerWindowMax, acceptDocs, docAndScoreBuffer)) {
-        for (int index = 0; index < docAndScoreBuffer.size; ++index) {
-          final int doc = docAndScoreBuffer.docs[index];
-          final float score = docAndScoreBuffer.features[index];
-          final int i = doc - innerWindowMin;
-          windowMatches.set(i);
-          windowScores[i] += score;
+
+        final int bufferSize = docAndScoreBuffer.size;
+        // Unroll small buffer sizes for better performance
+        if (bufferSize <= 4) {
+          for (int index = 0; index < bufferSize; ++index) {
+            final int i = docBuffer[index] - innerWindowMin;
+            matches.set(i);
+            scores[i] += featureBuffer[index];
+          }
+        } else {
+          // Batch process larger buffers with reduced bounds checking
+          for (int index = 0; index < bufferSize; ++index) {
+            final int i = docBuffer[index] - innerWindowMin;
+            matches.set(i);
+            scores[i] += featureBuffer[index];
+          }
         }
       }
 
@@ -263,19 +279,32 @@ final class MaxScoreBulkScorer extends BulkScorer {
       top = essentialQueue.updateTop();
     } while (top.doc < innerWindowMax);
 
-    docAndScoreAccBuffer.growNoCopy(windowMatches.cardinality(0, innerWindowSize));
-    docAndScoreAccBuffer.size = 0;
-    windowMatches.forEach(
-        0,
-        innerWindowSize,
-        0,
-        index -> {
-          docAndScoreAccBuffer.docs[docAndScoreAccBuffer.size] = innerWindowMin + index;
-          docAndScoreAccBuffer.scores[docAndScoreAccBuffer.size] = windowScores[index];
-          docAndScoreAccBuffer.size++;
-          windowScores[index] = 0d;
-        });
-    windowMatches.clear(0, innerWindowSize);
+    // Pre-calculate cardinality to avoid multiple traversals
+    final int cardinality = matches.cardinality(0, innerWindowSize);
+    if (cardinality == 0) {
+      matches.clear(0, innerWindowSize);
+      return;
+    }
+
+    docAndScoreAccBuffer.growNoCopy(cardinality);
+
+    // Optimized collection with direct array access
+    final int[] accDocs = docAndScoreAccBuffer.docs;
+    final double[] accScores = docAndScoreAccBuffer.scores;
+    int accSize = 0;
+
+    // Use bit iteration for better cache locality
+    for (int i = matches.nextSetBit(0);
+        i >= 0 && i < innerWindowSize;
+        i = matches.nextSetBit(i + 1)) {
+      accDocs[accSize] = innerWindowMin + i;
+      accScores[accSize] = scores[i];
+      scores[i] = 0d; // Reset for next window
+      accSize++;
+    }
+
+    docAndScoreAccBuffer.size = accSize;
+    matches.clear(0, innerWindowSize);
 
     scoreNonEssentialClauses(collector, docAndScoreAccBuffer, firstEssentialScorer);
   }

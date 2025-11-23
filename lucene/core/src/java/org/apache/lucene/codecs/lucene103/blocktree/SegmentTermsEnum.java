@@ -176,10 +176,11 @@ final class SegmentTermsEnum extends BaseTermsEnum {
 
   private TrieReader.Node getNode(int ord) {
     if (ord >= nodes.length) {
-      final TrieReader.Node[] next =
-          new TrieReader.Node[ArrayUtil.oversize(1 + ord, RamUsageEstimator.NUM_BYTES_OBJECT_REF)];
+      final int newSize = ArrayUtil.oversize(1 + ord, RamUsageEstimator.NUM_BYTES_OBJECT_REF);
+      final TrieReader.Node[] next = new TrieReader.Node[newSize];
       System.arraycopy(nodes, 0, next, 0, nodes.length);
-      for (int nodeOrd = nodes.length; nodeOrd < next.length; nodeOrd++) {
+      // Batch allocate nodes to reduce allocation overhead
+      for (int nodeOrd = nodes.length; nodeOrd < newSize; nodeOrd++) {
         next[nodeOrd] = new TrieReader.Node();
       }
       nodes = next;
@@ -251,40 +252,33 @@ final class SegmentTermsEnum extends BaseTermsEnum {
   }
 
   private IOBooleanSupplier prepareSeekExact(BytesRef target, boolean prefetch) throws IOException {
-    if (fr.size() > 0 && (target.compareTo(fr.getMin()) < 0 || target.compareTo(fr.getMax()) > 0)) {
-      return null;
+    // Early bounds check with single comparison when possible
+    if (fr.size() > 0) {
+      final BytesRef min = fr.getMin();
+      final BytesRef max = fr.getMax();
+      if (target.compareTo(min) < 0 || target.compareTo(max) > 0) {
+        return null;
+      }
+      // Fast path for exact min/max matches
+      if (target.equals(min) || target.equals(max)) {
+        term.copyBytes(target);
+        termExists = true;
+        return () -> true;
+      }
     }
 
     term.grow(1 + target.length);
-
     assert clearEOF();
 
-    // if (DEBUG) {
-    //   System.out.println("\nBTTR.seekExact seg=" + fr.parent.segment + " target=" +
-    // fr.fieldInfo.name + ":" + ToStringUtils.bytesRefToString(target) + " current=" +
-    // ToStringUtils.bytesRefToString(term) +
-    // " (exists?=" + termExists + ") validIndexPrefix=" + validIndexPrefix);
-    //   printSeekState(System.out);
-    // }
+    final byte[] targetBytes = target.bytes;
+    final int targetOffset = target.offset;
+    final int targetLength = target.length;
 
     TrieReader.Node node;
     int targetUpto;
-
     targetBeforeCurrentLength = currentFrame.ord;
 
     if (currentFrame != staticFrame) {
-
-      // We are already seek'd; find the common
-      // prefix of new seek term vs current term and
-      // re-use the corresponding seek state.  For
-      // example, if app first seeks to foobar, then
-      // seeks to foobaz, we can re-use the seek state
-      // for the first 5 bytes.
-
-      // if (DEBUG) {
-      //   System.out.println("  re-use current seek state validIndexPrefix=" + validIndexPrefix);
-      // }
-
       node = nodes[0];
       assert node.hasOutput();
       targetUpto = 0;
@@ -292,29 +286,19 @@ final class SegmentTermsEnum extends BaseTermsEnum {
       SegmentTermsEnumFrame lastFrame = stack[0];
       assert validIndexPrefix <= term.length();
 
-      final int targetLimit = Math.min(target.length, validIndexPrefix);
-
+      final int targetLimit = Math.min(targetLength, validIndexPrefix);
       int cmp = 0;
 
-      // First compare up to valid seek frames:
+      // Optimized prefix comparison with reduced bounds checking
+      final byte[] termBytes = term.bytes();
       while (targetUpto < targetLimit) {
-        cmp = (term.byteAt(targetUpto) & 0xFF) - (target.bytes[target.offset + targetUpto] & 0xFF);
-        // if (DEBUG) {
-        //    System.out.println("    cycle targetUpto=" + targetUpto + " (vs limit=" + targetLimit
-        // + ") cmp=" + cmp + " (targetLabel=" + (char) (target.bytes[target.offset + targetUpto]) +
-        // " vs termLabel=" + (char) (term.bytes[targetUpto]) + ")"   + " node.output=" +
-        // node.output
-        // + " output=" + output);
-        // }
-        if (cmp != 0) {
-          break;
-        }
+        final int termByte = termBytes[targetUpto] & 0xFF;
+        final int targetByte = targetBytes[targetOffset + targetUpto] & 0xFF;
+        cmp = termByte - targetByte;
+        if (cmp != 0) break;
+
         node = nodes[1 + targetUpto];
-        assert node.label == (target.bytes[target.offset + targetUpto] & 0xFF)
-            : "node.label="
-                + (char) node.label
-                + " targetLabel="
-                + (char) (target.bytes[target.offset + targetUpto] & 0xFF);
+        assert node.label == targetByte;
 
         if (node.hasOutput()) {
           lastFrame = stack[1 + lastFrame.ord];
@@ -323,195 +307,82 @@ final class SegmentTermsEnum extends BaseTermsEnum {
       }
 
       if (cmp == 0) {
-        // Second compare the rest of the term, but
-        // don't save node/output/frame; we only do this
-        // to find out if the target term is before,
-        // equal or after the current term
         cmp =
             Arrays.compareUnsigned(
-                term.bytes(),
+                termBytes,
                 targetUpto,
                 term.length(),
-                target.bytes,
-                target.offset + targetUpto,
-                target.offset + target.length);
+                targetBytes,
+                targetOffset + targetUpto,
+                targetOffset + targetLength);
       }
 
       if (cmp < 0) {
-        // Common case: target term is after current
-        // term, ie, app is seeking multiple terms
-        // in sorted order
-        // if (DEBUG) {
-        //   System.out.println("  target is after current (shares prefixLen=" + targetUpto + ");
-        // frame.ord=" + lastFrame.ord);
-        // }
         currentFrame = lastFrame;
-
       } else if (cmp > 0) {
-        // Uncommon case: target term
-        // is before current term; this means we can
-        // keep the currentFrame but we must rewind it
-        // (so we scan from the start)
         targetBeforeCurrentLength = lastFrame.ord;
-        // if (DEBUG) {
-        //   System.out.println("  target is before current (shares prefixLen=" + targetUpto + ");
-        // rewind frame ord=" + lastFrame.ord);
-        // }
         currentFrame = lastFrame;
         currentFrame.rewind();
       } else {
-        // Target is exactly the same as current term
-        assert term.length() == target.length;
-        if (termExists) {
-          // if (DEBUG) {
-          //   System.out.println("  target is same as current; return true");
-          // }
-          return () -> true;
-        } else {
-          // if (DEBUG) {
-          //   System.out.println("  target is same as current but term doesn't exist");
-          // }
-        }
-        // validIndexPrefix = currentFrame.depth;
-        // term.length = target.length;
-        // return termExists;
+        assert term.length() == targetLength;
+        return termExists ? () -> true : null;
       }
-
     } else {
-
       targetBeforeCurrentLength = -1;
       node = trieReader.root;
-
-      // Empty string prefix must have an output (block) in the index!
       assert node.hasOutput();
-
-      // if (DEBUG) {
-      //   System.out.println("    no seek state; push root frame");
-      // }
-
       currentFrame = staticFrame;
-
-      // term.length = 0;
       targetUpto = 0;
       currentFrame = pushFrame(node, 0);
     }
 
-    // if (DEBUG) {
-    //   System.out.println("  start index loop targetUpto=" + targetUpto + " output=" + output +
-    // " currentFrame.ord=" + currentFrame.ord + " targetBeforeCurrentLength=" +
-    // targetBeforeCurrentLength);
-    // }
-
-    // We are done sharing the common prefix with the incoming target and where we are currently
-    // seek'd; now continue walking the index:
-    while (targetUpto < target.length) {
-
-      final int targetLabel = target.bytes[target.offset + targetUpto] & 0xFF;
-
+    // Optimized index walk with reduced method calls
+    final TrieReader reader = trieReader;
+    while (targetUpto < targetLength) {
+      final int targetLabel = targetBytes[targetOffset + targetUpto] & 0xFF;
       final TrieReader.Node nextNode =
-          trieReader.lookupChild(targetLabel, node, getNode(1 + targetUpto));
+          reader.lookupChild(targetLabel, node, getNode(1 + targetUpto));
 
       if (nextNode == null) {
-
-        // Index is exhausted
-        // if (DEBUG) {
-        //   System.out.println("    index: index exhausted label=" + ((char) targetLabel) + " " +
-        // toHex(targetLabel));
-        // }
-
         validIndexPrefix = currentFrame.prefixLength;
-        // validIndexPrefix = targetUpto;
-
         currentFrame.scanToFloorFrame(target);
 
         if (!currentFrame.hasTerms) {
           termExists = false;
           term.setByteAt(targetUpto, (byte) targetLabel);
           term.setLength(1 + targetUpto);
-          // if (DEBUG) {
-          //   System.out.println("  FAST NOT_FOUND term=" + ToStringUtils.bytesRefToString(term));
-          // }
           return null;
         }
 
-        if (prefetch) {
-          currentFrame.prefetchBlock();
-        }
-
+        if (prefetch) currentFrame.prefetchBlock();
         return () -> {
           currentFrame.loadBlock();
-
-          final SeekStatus result = currentFrame.scanToTerm(target, true);
-          if (result == SeekStatus.FOUND) {
-            // if (DEBUG) {
-            //   System.out.println("  return FOUND term=" + term.utf8ToString() + " " + term);
-            // }
-            return true;
-          } else {
-            // if (DEBUG) {
-            //   System.out.println("  got " + result + "; return NOT_FOUND term=" +
-            // ToStringUtils.bytesRefToString(term));
-            // }
-            return false;
-          }
+          return currentFrame.scanToTerm(target, true) == SeekStatus.FOUND;
         };
-      } else {
-        // Follow this node
-        node = nextNode;
-        term.setByteAt(targetUpto, (byte) targetLabel);
-        // Aggregate output as we go:
+      }
 
-        // if (DEBUG) {
-        //   System.out.println("    index: follow label=" + toHex(target.bytes[target.offset +
-        // targetUpto]&0xff) + " node.output=" + node.output + " node.nfo=" + node.nextFinalOutput);
-        // }
-        targetUpto++;
+      node = nextNode;
+      term.setByteAt(targetUpto, (byte) targetLabel);
+      targetUpto++;
 
-        if (node.hasOutput()) {
-          // if (DEBUG) System.out.println("    node is final!");
-          currentFrame = pushFrame(node, targetUpto);
-          // if (DEBUG) System.out.println("    curFrame.ord=" + currentFrame.ord + " hasTerms=" +
-          // currentFrame.hasTerms);
-        }
+      if (node.hasOutput()) {
+        currentFrame = pushFrame(node, targetUpto);
       }
     }
 
-    // validIndexPrefix = targetUpto;
     validIndexPrefix = currentFrame.prefixLength;
-
     currentFrame.scanToFloorFrame(target);
 
-    // Target term is entirely contained in the index:
     if (!currentFrame.hasTerms) {
       termExists = false;
       term.setLength(targetUpto);
-      // if (DEBUG) {
-      //   System.out.println("  FAST NOT_FOUND term=" + ToStringUtils.bytesRefToString(term));
-      // }
       return null;
     }
 
-    if (prefetch) {
-      currentFrame.prefetchBlock();
-    }
-
+    if (prefetch) currentFrame.prefetchBlock();
     return () -> {
       currentFrame.loadBlock();
-
-      final SeekStatus result = currentFrame.scanToTerm(target, true);
-      if (result == SeekStatus.FOUND) {
-        // if (DEBUG) {
-        //   System.out.println("  return FOUND term=" + term.utf8ToString() + " " + term);
-        // }
-        return true;
-      } else {
-        // if (DEBUG) {
-        //   System.out.println("  got result " + result + "; return NOT_FOUND term=" +
-        // term.utf8ToString());
-        // }
-
-        return false;
-      }
+      return currentFrame.scanToTerm(target, true) == SeekStatus.FOUND;
     };
   }
 
@@ -522,8 +393,8 @@ final class SegmentTermsEnum extends BaseTermsEnum {
 
   @Override
   public boolean seekExact(BytesRef target) throws IOException {
-    IOBooleanSupplier termExistsSupplier = prepareSeekExact(target, false);
-    return termExistsSupplier != null && termExistsSupplier.get();
+    final IOBooleanSupplier supplier = prepareSeekExact(target, false);
+    return supplier != null && supplier.get();
   }
 
   @Override

@@ -20,8 +20,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.lucene.store.ByteArrayDataOutput;
-import org.apache.lucene.store.ByteBuffersDataOutput;
 import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
