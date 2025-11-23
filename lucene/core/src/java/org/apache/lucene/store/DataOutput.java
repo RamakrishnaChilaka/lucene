@@ -209,29 +209,71 @@ public abstract class DataOutput {
    * @throws IOException If there is an I/O error writing to the underlying medium.
    * @see DataInput#readVInt()
    */
-  public final void writeVInt(int i) throws IOException {
+  public final void writeVIntTmp(int i) throws IOException {
     // Fast path for common single-byte values (0-127)
     if ((i & ~0x7F) == 0) {
       writeByte((byte) i);
       return;
     }
-    
+
     // Unroll first iteration to avoid loop overhead for 2-byte values
     writeByte((byte) ((i & 0x7F) | 0x80));
     i >>>= 7;
-    
+
     if ((i & ~0x7F) == 0) {
       writeByte((byte) i);
       return;
     }
-    
+
     // Handle remaining bytes with loop
     do {
       writeByte((byte) ((i & 0x7F) | 0x80));
       i >>>= 7;
     } while ((i & ~0x7F) != 0);
-    
+
     writeByte((byte) i);
+  }
+
+  public void writeVInt(long value) throws IOException {
+    if (value < 251) {
+      writeByte((byte) value);
+    } else if (value < 0x10000) {
+      writeInt1(252);
+      writeInt2((int) value);
+    } else if (value < 0x1000000) {
+      writeInt1(253);
+      writeInt3((int) value);
+    } else {
+      writeInt1(254);
+      writeInt8(value);
+    }
+  }
+
+  public void writeInt1(int value) throws IOException {
+    writeByte((byte) (value & 0XFF));
+  }
+
+  public void writeInt2(int value) throws IOException {
+    writeByte((byte) value);
+    writeByte((byte) (value >> 8));
+  }
+
+  public void writeInt3(int value) throws IOException {
+    writeByte((byte) value);
+    writeByte((byte) (value >> 8));
+    writeByte((byte) (value >> 16));
+  }
+
+  public void writeInt8(long value) throws IOException {
+    writeInt4((int) value);
+    writeInt4((int) (value >> 32));
+  }
+
+  public void writeInt4(int value) throws IOException {
+    writeByte((byte) value);
+    writeByte((byte) (value >> 8));
+    writeByte((byte) (value >> 16));
+    writeByte((byte) (value >> 24));
   }
 
   /**
