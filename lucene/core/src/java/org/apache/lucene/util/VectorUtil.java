@@ -501,4 +501,8 @@ public final class VectorUtil {
   public static void expand8(int[] arr) {
     IMPL.expand8(arr);
   }
+
+  public static void collapse8(int[] arr) {
+    IMPL.collapse8(arr);
+  }
 }

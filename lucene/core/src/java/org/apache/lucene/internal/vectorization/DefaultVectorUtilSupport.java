@@ -427,4 +427,11 @@ final class DefaultVectorUtilSupport implements VectorUtilSupport {
       arr[192 + i] = l & 0xFF;
     }
   }
+
+  @Override
+  public void collapse8(int[] arr) {
+    for (int i = 0; i < 64; ++i) {
+      arr[i] = (arr[i] << 24) | (arr[64 + i] << 16) | (arr[128 + i] << 8) | arr[192 + i];
+    }
+  }
 }

@@ -21,6 +21,7 @@ import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static jdk.incubator.vector.VectorOperators.ADD;
 import static jdk.incubator.vector.VectorOperators.B2I;
 import static jdk.incubator.vector.VectorOperators.B2S;
+import static jdk.incubator.vector.VectorOperators.LSHL;
 import static jdk.incubator.vector.VectorOperators.LSHR;
 import static jdk.incubator.vector.VectorOperators.S2I;
 import static jdk.incubator.vector.VectorOperators.ZERO_EXTEND_B2I;
@@ -1432,6 +1433,21 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
         arr[128 + i] = (l >>> 8) & 0xFF;
         arr[192 + i] = l & 0xFF;
       }
+    }
+  }
+
+  @Override
+  public void collapse8(int[] arr) {
+    final int vLen = INT_SPECIES.length();
+    for (int i = 0; i < 64; i += vLen) {
+      IntVector b0 = IntVector.fromArray(INT_SPECIES, arr, i); // 0..7
+      IntVector b1 = IntVector.fromArray(INT_SPECIES, arr, 64 + i); // 64..71
+      IntVector b2 = IntVector.fromArray(INT_SPECIES, arr, 128 + i); // 128..135
+      IntVector b3 = IntVector.fromArray(INT_SPECIES, arr, 192 + i); // 192..199
+
+      IntVector res =
+          b0.lanewise(LSHL, 24).or(b1.lanewise(LSHL, 16)).or(b2.lanewise(LSHL, 8)).or(b3);
+      res.intoArray(arr, i);
     }
   }
 }
