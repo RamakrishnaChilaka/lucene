@@ -34,7 +34,7 @@ public final class TernaryLongHeap {
 
   private long[] heap;
   private int size = 0;
-  private static final int ARITY = 3;
+  private static final int ARITY = 4;
 
   /**
    * Constructs a heap with specified size and initializes all elements with the given value.
