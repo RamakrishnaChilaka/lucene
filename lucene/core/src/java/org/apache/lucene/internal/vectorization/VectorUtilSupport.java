@@ -152,4 +152,7 @@ public interface VectorUtilSupport {
    * beneficial here because the block size is 256.
    */
   void expand8(int[] arr);
+
+  void splitInts(
+      int count, int[] b, int bShift, int dec, int bMask, int[] c, int cIndex, int cMask);
 }

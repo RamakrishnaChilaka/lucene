@@ -18,6 +18,7 @@ package org.apache.lucene.internal.vectorization;
 
 import java.io.IOException;
 import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.util.VectorUtil;
 
 /** Utility class to decode postings. */
 public class PostingDecodingUtil {
@@ -45,21 +46,6 @@ public class PostingDecodingUtil {
       int count, int[] b, int bShift, int dec, int bMask, int[] c, int cIndex, int cMask)
       throws IOException {
     in.readInts(c, cIndex, count);
-    final int maxIter = (bShift - 1) / dec;
-
-    // Process each shift level across all elements (better for vectorization)
-    for (int j = 0; j <= maxIter; ++j) {
-      final int shift = bShift - j * dec;
-      final int bOffset = count * j;
-      // Vectorizable loop: contiguous memory access with simple operations
-      for (int i = 0; i < count; ++i) {
-        b[bOffset + i] = (c[cIndex + i] >>> shift) & bMask;
-      }
-    }
-
-    // Apply mask to c array (vectorizable)
-    for (int i = 0; i < count; ++i) {
-      c[cIndex + i] &= cMask;
-    }
+    VectorUtil.splitInts(count, b, bShift, dec, bMask, c, cIndex, cMask);
   }
 }

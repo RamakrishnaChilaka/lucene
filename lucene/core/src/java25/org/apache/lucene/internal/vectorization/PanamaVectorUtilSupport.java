@@ -1434,4 +1434,49 @@ final class PanamaVectorUtilSupport implements VectorUtilSupport {
       }
     }
   }
+
+  @Override
+  public void splitInts(
+      int count, int[] b, int bShift, int dec, int bMask, int[] c, int cIndex, int cMask) {
+
+    final int maxIter = (bShift - 1) / dec;
+    final VectorSpecies<Integer> S = IntVector.SPECIES_PREFERRED;
+    final int vlen = S.length();
+
+    // --- Vectorized core loops ---
+    for (int j = 0; j <= maxIter; ++j) {
+      final int shift = bShift - j * dec;
+      final int bOffset = count * j;
+
+      int i = 0;
+      for (; i <= count - vlen; i += vlen) {
+        // Load vector from c
+        IntVector vc = IntVector.fromArray(S, c, cIndex + i);
+
+        // Perform vectorized (x >>> shift) & bMask
+        IntVector vb =
+            vc.lanewise(VectorOperators.LSHR, shift).lanewise(VectorOperators.AND, bMask);
+
+        // Store result into b
+        vb.intoArray(b, bOffset + i);
+      }
+
+      // Tail (scalar)
+      for (; i < count; ++i) {
+        b[bOffset + i] = (c[cIndex + i] >>> shift) & bMask;
+      }
+    }
+
+    // --- Vectorized c-mask ---
+    int k = 0;
+    for (; k <= count - vlen; k += vlen) {
+      IntVector vc = IntVector.fromArray(S, c, cIndex + k);
+      vc.lanewise(VectorOperators.AND, cMask).intoArray(c, cIndex + k);
+    }
+
+    // tail
+    for (; k < count; ++k) {
+      c[cIndex + k] &= cMask;
+    }
+  }
 }

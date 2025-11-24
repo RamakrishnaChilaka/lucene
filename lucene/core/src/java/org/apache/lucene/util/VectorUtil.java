@@ -501,4 +501,9 @@ public final class VectorUtil {
   public static void expand8(int[] arr) {
     IMPL.expand8(arr);
   }
+
+  public static void splitInts(
+      int count, int[] b, int bShift, int dec, int bMask, int[] c, int cIndex, int cMask) {
+    IMPL.splitInts(count, b, bShift, dec, bMask, c, cIndex, cMask);
+  }
 }

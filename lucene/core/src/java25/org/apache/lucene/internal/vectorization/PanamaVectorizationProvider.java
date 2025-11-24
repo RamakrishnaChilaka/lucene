@@ -85,12 +85,12 @@ final class PanamaVectorizationProvider extends VectorizationProvider {
 
   @Override
   public PostingDecodingUtil newPostingDecodingUtil(IndexInput input) throws IOException {
-    if (input instanceof MemorySegmentAccessInput msai) {
-      MemorySegment ms = msai.segmentSliceOrNull(0, input.length());
-      if (ms != null) {
-        return new MemorySegmentPostingDecodingUtil(input, ms);
-      }
-    }
+//    if (input instanceof MemorySegmentAccessInput msai) {
+//      MemorySegment ms = msai.segmentSliceOrNull(0, input.length());
+//      if (ms != null) {
+//        return new MemorySegmentPostingDecodingUtil(input, ms);
+//      }
+//    }
     return new PostingDecodingUtil(input);
   }
 }

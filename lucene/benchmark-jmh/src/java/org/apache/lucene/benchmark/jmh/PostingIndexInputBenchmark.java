@@ -91,13 +91,6 @@ public class PostingIndexInputBenchmark {
   }
 
   @Benchmark
-  public void decode(Blackhole bh) throws IOException {
-    in.seek(3); // random unaligned offset
-    postingIn.decode(bpv, values);
-    bh.consume(values);
-  }
-
-  @Benchmark
   @Fork(jvmArgsPrepend = {"--add-modules=jdk.incubator.vector"})
   public void decodeVector(Blackhole bh) throws IOException {
     in.seek(3); // random unaligned offset

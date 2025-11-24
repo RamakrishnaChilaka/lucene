@@ -427,4 +427,25 @@ final class DefaultVectorUtilSupport implements VectorUtilSupport {
       arr[192 + i] = l & 0xFF;
     }
   }
+
+  @Override
+  public void splitInts(
+      int count, int[] b, int bShift, int dec, int bMask, int[] c, int cIndex, int cMask) {
+    final int maxIter = (bShift - 1) / dec;
+
+    // Process each shift level across all elements (better for vectorization)
+    for (int j = 0; j <= maxIter; ++j) {
+      final int shift = bShift - j * dec;
+      final int bOffset = count * j;
+      // Vectorizable loop: contiguous memory access with simple operations
+      for (int i = 0; i < count; ++i) {
+        b[bOffset + i] = (c[cIndex + i] >>> shift) & bMask;
+      }
+    }
+
+    // Apply mask to c array (vectorizable)
+    for (int i = 0; i < count; ++i) {
+      c[cIndex + i] &= cMask;
+    }
+  }
 }
